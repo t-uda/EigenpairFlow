@@ -1,4 +1,5 @@
 import numpy as np
+import networkx as nx
 import os
 import tempfile
 from eigenpairflow import track_and_analyze_eigenvalue_decomposition, create_n_partite_graph, EigenTrackingResults

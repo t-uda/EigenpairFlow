@@ -167,10 +167,9 @@ def plot_eigen_tracking_results(results: EigenTrackingResults, axes=None):
         np.ndarray: A numpy array of the used axes objects.
     """
     if axes is None:
-        fig, axes = plt.subplots(1, 3, figsize=(18, 6))
+        _, axes = plt.subplots(1, 3, figsize=(18, 6))
         show_plot = True
     else:
-        fig = axes[0].get_figure()
         show_plot = False
 
     plot_eigenvalue_trajectories(results, ax=axes[0])

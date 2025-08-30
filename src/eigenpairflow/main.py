@@ -2,8 +2,6 @@ import numpy as np
 import scipy.linalg
 import scipy.integrate
 import networkx as nx
-from collections import namedtuple
-import joblib
 from scipy.optimize import linear_sum_assignment
 
 from .types import EigenTrackingResults
@@ -143,6 +141,7 @@ def track_eigen_decomposition(A_func, dA_func, t_span, t_eval, rtol=1e-5, atol=1
         raise RuntimeError(f"Integration failed. {sol.message=}")
 
     # 結果をリストに復元
+    actual_t = sol.t
     Qs = [sol_y[:n*n].reshape((n, n)) for sol_y in sol.y.T]
     Lambdas = [np.diag(sol_y[n*n:]) for sol_y in sol.y.T]
 
@@ -328,11 +327,8 @@ def track_and_analyze_eigenvalue_decomposition(G, apply_correction=True):
 
 
     # 2. Define the matrix functions A(t) and dA/dt
-    def A_func(t):
-        return np.exp(-t * D)
-
-    def dA_func(t):
-        return -D * A_func(t)
+    A_func = lambda t: np.exp(-t * D)
+    dA_func = lambda t: -D * np.exp(-t * D)
 
     # 3. Define time span and evaluation points
     t_start, t_end = 4.0, 1.0e-2 # Example time span
