@@ -43,6 +43,44 @@ This ensures that the project's dependencies remain consistent and reproducible.
 4.  **Verify Changes**:
     Before finalizing your work, review your changes to ensure they are within the scope of the assigned task and do not include any unintended modifications. A good way to do this is to review the output of `git diff`.
 
+## Notebook Development
+
+When working with notebooks for verification or demonstration, follow these guidelines:
+
+-   Add any necessary notebook development dependencies to the `[tool.poetry.group.dev.dependencies]` section in `pyproject.toml`.
+-   Ensure the development environment can be set up by running `poetry install`.
+-   The CI/CD pipeline does not run or test notebooks, but including tools for a better local development experience is encouraged.
+-   To make the Poetry environment's kernel available in Jupyter, add `ipykernel` as a dev dependency. You can then register the kernel using a command like `poetry run python -m ipykernel install --user --name=eigenpairflow`.
+
+### How to Use the Notebook Environment
+
+1.  **Launch JupyterLab:**
+    ```bash
+    poetry run jupyter lab
+    ```
+
+2.  **Select the Kernel:**
+    When creating a new notebook in JupyterLab, be sure to select the `eigenpairflow` kernel. This ensures that your notebook runs in the project's Poetry environment and has access to all required dependencies.
+
+### Using Papermill for Automated Execution
+
+`papermill` is a tool for running notebooks programmatically. It is particularly useful for automation, reproducibility, and parameterizing notebooks.
+
+-   **Parameterization:** To make a notebook parameterizable, create a cell with the tag `parameters`. Variables in this cell can be overridden from the command line.
+-   **Execution:** You can run a notebook and save the output version (with all cell outputs) using the following command structure.
+
+**Example:**
+
+```bash
+poetry run papermill \\
+  notebooks/your_notebook.ipynb \\
+  notebooks/output.ipynb \\
+  -p alpha 0.5 \\
+  -p model_type "fancy_model"
+```
+
+This command executes `your_notebook.ipynb`, sets the `alpha` parameter to `0.5` and `model_type` to `"fancy_model"`, and saves the resulting notebook to `output.ipynb`.
+
 ## Language and Style
 
 *   **Coding Style:** All Python code should adhere to the [PEP 8 style guide](https://peps.python.org/pep-0008/). The `ruff` pre-commit hook helps enforce this.
