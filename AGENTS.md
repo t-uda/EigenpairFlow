@@ -28,10 +28,14 @@ Before committing any changes, please follow these steps to ensure code quality 
     poetry run pytest
     ```
 
-5.  **Commit your changes:**
-    Once all checks pass, you can commit your changes.
+5.  **Verify Changes**:
+    Before committing, review your changes to ensure they are within the scope of the assigned task and do not include any unintended modifications. A good way to do this is to review the output of `git diff`.
+
+6.  **Commit your changes:**
+    Once all checks pass and you have verified the scope of your changes, you can commit them.
 
 ## Language and Style
 
+*   **Coding Style:** All Python code should adhere to the [PEP 8 style guide](https://peps.python.org/pep-0008/). `ruff` is configured to enforce this.
 *   **Docstrings:** Docstrings must be written in **Japanese**. They can include simple English terms where appropriate.
 *   **Comments:** Code comments other than docstrings can be written in English.
