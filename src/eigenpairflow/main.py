@@ -273,14 +273,13 @@ def create_n_partite_graph(partition_sizes, edge_lengths_dict):
 
     return G
 
-def track_and_analyze_eigenvalue_decomposition(G, apply_correction=True, analyze=True):
+def track_and_analyze_eigenvalue_decomposition(G, apply_correction=True):
     """
     グラフの距離行列から構成される行列 A(t) = exp(-tD) の固有値分解を追跡・分析する。
 
     Args:
         G (nx.Graph): 解析対象の重み付きグラフ。辺には 'length' 属性が必要。
         apply_correction (bool): 軌跡の事後補正を適用するかどうか。
-        analyze (bool): マグニチュード解析を適用するかどうか。
 
     Returns:
         EigenTrackingResults: 追跡と分析の結果を格納した名前付きタプル。
@@ -291,12 +290,12 @@ def track_and_analyze_eigenvalue_decomposition(G, apply_correction=True, analyze
     except nx.NetworkXNoPath:
          # Handle disconnected graphs if necessary, or let it propagate
          return EigenTrackingResults(
-            t_eval=None, Qs=None, Lambdas=None, magnitudes=None,
-            pseudo_magnitudes=None, errors=None, zero_indices=None,
+            t_eval=None, Qs=None, Lambdas=None, errors=None, zero_indices=None,
             success=False, message="Graph is disconnected.", state=None,
             errors_before_correction=None
         )
 
+    n = D.shape[0]
 
     # 2. Define the matrix functions A(t) and dA/dt
     def A_func(t):
@@ -328,14 +327,10 @@ def track_and_analyze_eigenvalue_decomposition(G, apply_correction=True, analyze
     # If tracking failed, return early
     if not success:
          return EigenTrackingResults(
-            t_eval=sol.t if sol else None, Qs=None, Lambdas=None, magnitudes=None,
-            pseudo_magnitudes=None, errors=None, zero_indices=None,
+            t_eval=sol.t if sol else None, Qs=None, Lambdas=None, errors=None, zero_indices=None,
             success=success, message=message, state=state,
             errors_before_correction=None
         )
-
-
-    # 6. Extract the original eigenvalue traces
     eigenvalues_traces = np.array([np.diag(L) for L in Lambdas_ode])
 
     # 7. Identify indices of eigenvalues that cross zero
@@ -345,15 +340,8 @@ def track_and_analyze_eigenvalue_decomposition(G, apply_correction=True, analyze
         if np.amin(lambda_i) < 0.0 < np.amax(lambda_i):
             zero_indices.append(i)
 
-    # 8. Calculate original magnitudes, pseudo-magnitudes, and reconstruction errors
-    original_magnitudes, original_pseudo_magnitudes = None, None
+    # 8. Calculate reconstruction errors
     errors_before_correction = []
-
-    if analyze:
-        original_magnitudes, original_pseudo_magnitudes = calculate_magnitudes_and_pseudo(
-            Qs_ode, Lambdas_ode, D.shape[0], zero_indices
-        )
-
     for i, t in enumerate(sol.t):
         Q_t = Qs_ode[i]
         Lambda_t = Lambdas_ode[i]
@@ -376,18 +364,9 @@ def track_and_analyze_eigenvalue_decomposition(G, apply_correction=True, analyze
                 A_func, sol.t, Qs_ode, Lambdas_ode
             )
 
-            # Calculate corrected magnitudes and pseudo-magnitudes
-            if analyze:
-                corrected_magnitudes, corrected_pseudo_magnitudes = calculate_magnitudes_and_pseudo(
-                    corrected_Qs, corrected_Lambdas, D.shape[0], zero_indices
-                )
-
             errors_after_correction = []
-
             for i, t in enumerate(sol.t):
-                Q_t = corrected_Qs[i]
-                Lambda_t = corrected_Lambdas[i]
-                # Calculate corrected reconstruction error
+                Q_t, Lambda_t = corrected_Qs[i], corrected_Lambdas[i]
                 A_t = A_func(t)
                 reconstructed_A = Q_t @ Lambda_t @ Q_t.T
                 error = np.linalg.norm(A_t - reconstructed_A, 'fro')
@@ -400,35 +379,21 @@ def track_and_analyze_eigenvalue_decomposition(G, apply_correction=True, analyze
 
 
     # 11. Select results based on apply_correction flag
-    if apply_correction:
-        final_Qs = corrected_Qs
-        final_Lambdas = corrected_Lambdas
-        final_magnitudes = corrected_magnitudes
-        final_pseudo_magnitudes = corrected_pseudo_magnitudes
-        final_errors = errors_after_correction
-        final_errors_before_correction = errors_before_correction
-    else:
-        final_Qs = Qs_ode
-        final_Lambdas = Lambdas_ode
-        final_magnitudes = original_magnitudes
-        final_pseudo_magnitudes = original_pseudo_magnitudes
-        final_errors = errors_before_correction
-        final_errors_before_correction = None # Set to None if correction wasn't applied
-
+    final_Qs = corrected_Qs if apply_correction else Qs_ode
+    final_Lambdas = corrected_Lambdas if apply_correction else Lambdas_ode
+    final_errors = errors_after_correction if apply_correction else errors_before_correction
 
     # 12. Populate the EigenTrackingResults namedtuple
     results = EigenTrackingResults(
         t_eval=sol.t,
         Qs=final_Qs,
         Lambdas=final_Lambdas,
-        magnitudes=final_magnitudes,
-        pseudo_magnitudes=final_pseudo_magnitudes,
-        errors=final_errors,
+        errors=np.array(final_errors),
         zero_indices=zero_indices,
         success=success,
         message=message,
         state=state,
-        errors_before_correction=final_errors_before_correction # Include only if correction applied
+        errors_before_correction=np.array(errors_before_correction) if apply_correction else None
     )
 
     # 13. Return the namedtuple
