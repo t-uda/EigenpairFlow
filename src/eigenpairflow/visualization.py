@@ -93,15 +93,19 @@ def plot_reconstruction_error(results: EigenTrackingResults, ax=None):
 
     return ax
 
-def plot_magnitudes(t_eval, magnitudes, pseudo_magnitudes, ax=None):
+def plot_magnitudes(t_eval, magnitudes, pseudo_magnitudes_indices=None, ax=None):
     """
-    マグニチュードと擬似マグニチュードの軌跡をプロットする。
+    Plots the magnitude trajectories for each eigenvalue.
+
+    Highlights the trajectories of eigenvalues that cross zero.
 
     Args:
-        t_eval (np.ndarray): 評価時刻。
-        magnitudes (list[float]): マグニチュードのリスト。
-        pseudo_magnitudes (list[float]): 擬似マグニチュードのリスト。
-        ax (matplotlib.axes.Axes, optional): プロット用の軸オブジェクト。
+        t_eval (np.ndarray): Array of time points.
+        magnitudes (np.ndarray): 2D array of magnitudes (n_timesteps x n_eigenvalues).
+        pseudo_magnitudes_indices (list[int], optional): List of indices of eigenvalues
+                                                         that cross zero. Defaults to None.
+        ax (matplotlib.axes.Axes, optional): The axes object to plot on.
+                                             If None, a new figure and axes are created.
     """
     if ax is None:
         fig, ax = plt.subplots(1, 1, figsize=(8, 6))
@@ -109,20 +113,25 @@ def plot_magnitudes(t_eval, magnitudes, pseudo_magnitudes, ax=None):
     else:
         show_plot = False
 
-    if magnitudes is not None and pseudo_magnitudes is not None and t_eval is not None:
-        ax.plot(t_eval, magnitudes, color='darkred', label='Magnitude')
-        ax.plot(t_eval, pseudo_magnitudes, color='darkgreen', label='Pseudo-Magnitude')
+    if magnitudes is not None and t_eval is not None:
+        num_eigenvalues = magnitudes.shape[1]
+        for i in range(num_eigenvalues):
+            label = f'Magnitude of λ_{i+1}'
+            style = {'linewidth': 2}
+            if pseudo_magnitudes_indices and i in pseudo_magnitudes_indices:
+                label += ' (zero-crossing)'
+                style['linestyle'] = '--'
+                style['color'] = 'red'
+                ax.plot(t_eval, magnitudes[:, i], label=label, **style)
+            else:
+                style['alpha'] = 0.7
+                ax.plot(t_eval, magnitudes[:, i], **style)
 
-        ax.set_title('Magnitude vs Pseudo-Magnitude')
+
+        ax.set_title('Magnitude Trajectories')
         ax.set_xlabel('Parameter t')
         ax.set_xscale('log')
-        ax.set_ylabel('Value')
-        # Set a reasonable y-axis limit
-        y_min = -1
-        if pseudo_magnitudes:
-            y_max = np.amax(pseudo_magnitudes) + 2
-            ax.set_ylim(y_min, y_max)
-
+        ax.set_ylabel('Magnitude M(t) = -log(λ(t))/t')
         ax.legend()
         ax.grid(True)
 
@@ -131,14 +140,14 @@ def plot_magnitudes(t_eval, magnitudes, pseudo_magnitudes, ax=None):
 
     return ax
 
-def plot_eigen_tracking_results(results: EigenTrackingResults, magnitudes, pseudo_magnitudes, axes=None):
+def plot_eigen_tracking_results(results: EigenTrackingResults, magnitudes, pseudo_magnitudes_indices, axes=None):
     """
     固有値追跡の全結果（軌跡、誤差、マグニチュード）を一つの図にまとめてプロットする。
 
     Args:
         results (EigenTrackingResults): 追跡結果。
-        magnitudes (list[float]): マグニチュードのリスト。
-        pseudo_magnitudes (list[float]): 擬似マグニチュードのリスト。
+        magnitudes (np.ndarray): マグニチュードの2D配列。
+        pseudo_magnitudes_indices (list[int]): 擬似マグニチュードのインデックスのリスト。
         axes (np.ndarray, optional): プロット用の軸オブジェクトの配列。
     """
     if axes is None:
@@ -149,7 +158,7 @@ def plot_eigen_tracking_results(results: EigenTrackingResults, magnitudes, pseud
 
     plot_eigenvalue_trajectories(results, ax=axes[0])
     plot_reconstruction_error(results, ax=axes[1])
-    plot_magnitudes(results.t_eval, magnitudes, pseudo_magnitudes, ax=axes[2])
+    plot_magnitudes(results.t_eval, magnitudes, pseudo_magnitudes_indices, ax=axes[2])
 
     plt.tight_layout()
 

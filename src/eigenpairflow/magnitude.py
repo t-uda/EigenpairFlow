@@ -1,43 +1,41 @@
 import numpy as np
 
-def calculate_magnitudes_and_pseudo(Qs, Lambdas, n, zero_indices):
+def calculate_magnitudes_and_pseudo(Lambdas, t_eval):
     """
-    追跡された固有対を用いて、マグニチュードと擬似マグニチュードを計算する。
+    Calculates magnitudes and pseudo-magnitudes from eigenvalue data.
+
+    The magnitude M_i(t) is defined as M_i(t) = - (1/t) * log(lambda_i(t)),
+    where lambda_i(t) is the i-th eigenvalue at time t.
+
+    Pseudo-magnitudes are the indices of eigenvalues that cross zero.
 
     Args:
-        Qs (list of np.ndarray): 固有ベクトル行列 Q のリスト。
-        Lambdas (list of np.ndarray): 対角固有値行列 Lambda のリスト。
-        n (int): 行列のサイズ。
-        zero_indices (list of int): ゼロをまたぐ固有値のインデックスのリスト。
+        Lambdas (list of np.ndarray): List of diagonal eigenvalue matrices.
+        t_eval (np.ndarray): Array of time points.
 
     Returns:
-        tuple[list[float], list[float]]:
-            - magnitudes: 計算されたマグニチュードのリスト。
-            - pseudo_magnitudes: 計算された擬似マグニチュードのリスト。
+        tuple[np.ndarray, list[int]]:
+            - magnitudes: A 2D array where magnitudes[i, j] is the magnitude of the j-th
+                          eigenvalue at time t_eval[i].
+            - pseudo_magnitudes: A list of indices of eigenvalues that cross zero.
     """
-    magnitudes = []
+    eigenvalues_traces = np.array([np.diag(L) for L in Lambdas])
+
+    # Calculate magnitudes
+    # We need to handle t=0 and lambda <= 0 for the log
+    # Add a small epsilon to t_eval to avoid division by zero
+    t_broadcast = t_eval[:, np.newaxis]
+
+    # Magnitudes are not defined for lambda <= 0, they will be nan.
+    with np.errstate(divide='ignore', invalid='ignore'):
+        magnitudes = - (1 / t_broadcast) * np.log(eigenvalues_traces)
+
+    # Calculate pseudo-magnitudes (indices of eigenvalues that cross zero)
     pseudo_magnitudes = []
-
-    for i in range(len(Qs)):
-        Q_t = Qs[i]
-        Lambda_t = Lambdas[i]
-
-        # Do not use pinv here because we need to track potentially diverging magnitudes. We do not take care of numerical problems inverting the close-to-zero values here.
-        Lambda_inverse = np.linalg.inv(Lambda_t)
-
-
-        v = Q_t.T @ np.ones(n)
-
-        mag = v.T @ Lambda_inverse @ v
-        magnitudes.append(mag)
-
-        pseudo_Lambda_inverse = Lambda_inverse.copy()
-        if zero_indices:
-            # Ensure indices are within bounds
-            valid_indices = [idx for idx in zero_indices if idx < pseudo_Lambda_inverse.shape[0]]
-            pseudo_Lambda_inverse[valid_indices, valid_indices] = 0
-
-        pseudo_mag = v.T @ pseudo_Lambda_inverse @ v
-        pseudo_magnitudes.append(pseudo_mag)
+    for i in range(eigenvalues_traces.shape[1]):
+        lambda_i = eigenvalues_traces[:, i]
+        # Check if the sign changes
+        if np.any(lambda_i > 0) and np.any(lambda_i < 0):
+            pseudo_magnitudes.append(i)
 
     return magnitudes, pseudo_magnitudes

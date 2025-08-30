@@ -1,4 +1,5 @@
-from eigenpairflow import track_and_analyze_eigenvalue_decomposition, create_n_partite_graph
+from eigenpairflow import track_eigenvalue_decomposition, create_n_partite_graph, calculate_magnitudes_and_pseudo
+import numpy as np
 
 def test_track_and_analyze_eigenvalue_decomposition_runs():
     """
@@ -18,7 +19,7 @@ def test_track_and_analyze_eigenvalue_decomposition_runs():
     G = create_n_partite_graph(partitions, lengths)
 
     # Run the analysis function
-    results = track_and_analyze_eigenvalue_decomposition(G, apply_correction=True)
+    results = track_eigenvalue_decomposition(G, apply_correction=True)
 
     # Assert that the function ran successfully
     assert results.success
@@ -26,3 +27,12 @@ def test_track_and_analyze_eigenvalue_decomposition_runs():
     assert results.Qs is not None
     assert results.Lambdas is not None
     assert results.errors is not None
+
+    # Now, calculate magnitudes and pseudo-magnitudes
+    magnitudes, pseudo_magnitudes_indices = calculate_magnitudes_and_pseudo(
+        results.Lambdas,
+        results.t_eval
+    )
+
+    assert isinstance(magnitudes, np.ndarray)
+    assert isinstance(pseudo_magnitudes_indices, list)

@@ -272,16 +272,16 @@ def create_n_partite_graph(partition_sizes, edge_lengths_dict):
 
     return G
 
-def track_and_analyze_eigenvalue_decomposition(G, apply_correction=True):
+def track_eigenvalue_decomposition(G, apply_correction=True):
     """
-    グラフの距離行列から構成される行列 A(t) = exp(-tD) の固有値分解を追跡・分析する。
+    グラフの距離行列から構成される行列 A(t) = exp(-tD) の固有値分解を追跡する。
 
     Args:
         G (nx.Graph): 解析対象の重み付きグラフ。辺には 'length' 属性が必要。
         apply_correction (bool): 軌跡の事後補正を適用するかどうか。
 
     Returns:
-        EigenTrackingResults: 追跡と分析の結果を格納した名前付きタプル。
+        EigenTrackingResults: 追跡の結果を格納した名前付きタプル。
     """
     # 1. Compute the distance matrix D from the input graph G
     try:
@@ -289,7 +289,7 @@ def track_and_analyze_eigenvalue_decomposition(G, apply_correction=True):
     except nx.NetworkXNoPath:
          # Handle disconnected graphs if necessary, or let it propagate
          return EigenTrackingResults(
-            t_eval=None, Qs=None, Lambdas=None, errors=None, zero_indices=None,
+            t_eval=None, Qs=None, Lambdas=None, errors=None,
             success=False, message="Graph is disconnected.", state=None,
             errors_before_correction=None
         )
@@ -324,18 +324,10 @@ def track_and_analyze_eigenvalue_decomposition(G, apply_correction=True):
     # If tracking failed, return early
     if not success:
          return EigenTrackingResults(
-            t_eval=sol.t if sol else None, Qs=None, Lambdas=None, errors=None, zero_indices=None,
+            t_eval=sol.t if sol else None, Qs=None, Lambdas=None, errors=None,
             success=success, message=message, state=state,
             errors_before_correction=None
         )
-    eigenvalues_traces = np.array([np.diag(L) for L in Lambdas_ode])
-
-    # 7. Identify indices of eigenvalues that cross zero
-    zero_indices = []
-    for i in range(eigenvalues_traces.shape[1]):
-        lambda_i = eigenvalues_traces[:, i]
-        if np.amin(lambda_i) < 0.0 < np.amax(lambda_i):
-            zero_indices.append(i)
 
     # 8. Calculate reconstruction errors
     errors_before_correction = []
@@ -384,7 +376,6 @@ def track_and_analyze_eigenvalue_decomposition(G, apply_correction=True):
         Qs=final_Qs,
         Lambdas=final_Lambdas,
         errors=np.array(final_errors),
-        zero_indices=zero_indices,
         success=success,
         message=message,
         state=state,
