@@ -1,6 +1,6 @@
 # EigenpairFlow
 
-[![CI](https://github.com/eigenpairflow/eigenpairflow/actions/workflows/ci.yml/badge.svg)](https://github.com/eigenpairflow/eigenpairflow/actions/workflows/ci.yml)
+[![CI](https://github.com/t-uda/EigenpairFlow/actions/workflows/ci.yml/badge.svg)](https://github.com/t-uda/EigenpairFlow/actions/workflows/ci.yml)
 
 Continuous and stable tracking of eigendecomposition for parameter-dependent matrices.
 
