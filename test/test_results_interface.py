@@ -13,7 +13,6 @@ def test_eigen_tracking_results_str_representation():
         Qs=[np.eye(2), np.eye(2)],
         Lambdas=[np.diag([1, 2]), np.diag([1, 2])],
         errors=np.array([0.0, 0.0]),
-        zero_indices=[],
         success=True,
         message="Completed successfully.",
         state=0,
@@ -29,7 +28,7 @@ def test_eigen_tracking_results_str_representation():
 
     # Create a dummy failed result object
     failed_results = EigenTrackingResults(
-        t_eval=None, Qs=None, Lambdas=None, errors=None, zero_indices=None,
+        t_eval=None, Qs=None, Lambdas=None, errors=None,
         success=False, message="Graph is disconnected.", state=None,
         errors_before_correction=None
     )
@@ -75,4 +74,3 @@ def test_eigen_tracking_results_serialization():
             np.testing.assert_array_equal(results.Qs[i], loaded_results.Qs[i])
             np.testing.assert_array_equal(results.Lambdas[i], loaded_results.Lambdas[i])
         np.testing.assert_array_equal(results.errors, loaded_results.errors)
-        assert results.zero_indices == loaded_results.zero_indices

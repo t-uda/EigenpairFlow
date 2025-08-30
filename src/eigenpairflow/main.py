@@ -320,7 +320,7 @@ def track_and_analyze_eigenvalue_decomposition(G, apply_correction=True):
          # The second element (D) can be None.
          return EigenTrackingResults(
             t_eval=None, Qs=None, Lambdas=None,
-            errors=None, zero_indices=None,
+            errors=None,
             success=False, message="Graph is disconnected.", state=None,
             errors_before_correction=None
         ), None
@@ -357,7 +357,7 @@ def track_and_analyze_eigenvalue_decomposition(G, apply_correction=True):
     if not success:
          return EigenTrackingResults(
             t_eval=sol.t if sol else None, Qs=None, Lambdas=None,
-            errors=None, zero_indices=None,
+            errors=None,
             success=success, message=message, state=state,
             errors_before_correction=None
         )
@@ -406,7 +406,6 @@ def track_and_analyze_eigenvalue_decomposition(G, apply_correction=True):
         Qs=final_Qs,
         Lambdas=final_Lambdas,
         errors=final_errors,
-        zero_indices=None, # zero_indices is now calculated in the magnitude module
         success=success,
         message=message,
         state=state,

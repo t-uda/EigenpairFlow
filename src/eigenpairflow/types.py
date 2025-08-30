@@ -9,7 +9,6 @@ _EigenTrackingResults = namedtuple(
         'Qs',
         'Lambdas',
         'errors',
-        'zero_indices',
         'success',
         'message',
         'state',
