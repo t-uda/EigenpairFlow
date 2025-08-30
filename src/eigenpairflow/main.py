@@ -3,6 +3,7 @@ import scipy.linalg
 import scipy.integrate
 import networkx as nx
 from collections import namedtuple
+import joblib
 from scipy.optimize import linear_sum_assignment
 import matplotlib.pyplot as plt
 
@@ -141,7 +142,6 @@ def track_eigen_decomposition(A_func, dA_func, t_span, t_eval, rtol=1e-5, atol=1
         raise RuntimeError(f"Integration failed. {sol.message=}")
 
     # 結果をリストに復元
-    actual_t = sol.t
     Qs = [sol_y[:n*n].reshape((n, n)) for sol_y in sol.y.T]
     Lambdas = [np.diag(sol_y[n*n:]) for sol_y in sol.y.T]
 
@@ -273,8 +273,8 @@ def create_n_partite_graph(partition_sizes, edge_lengths_dict):
 
     return G
 
-EigenTrackingResults = namedtuple(
-    'EigenTrackingResults',
+_EigenTrackingResults = namedtuple(
+    '_EigenTrackingResults',
     [
         't_eval',
         'Qs',
@@ -289,6 +289,58 @@ EigenTrackingResults = namedtuple(
         'errors_before_correction' # This will be None if correction is not applied
     ]
 )
+
+class EigenTrackingResults(_EigenTrackingResults):
+    """
+    Results of eigenpair tracking.
+
+    This class extends the namedtuple _EigenTrackingResults to provide
+    additional methods for a better user experience, such as a custom
+    string representation and serialization methods.
+    """
+    def __str__(self):
+        """
+        Provides a concise summary of the tracking results.
+        """
+        if not self.success:
+            return f"EigenTracking failed: {self.message}"
+
+        summary = []
+        summary.append(f"success: {self.success}")
+        summary.append(f"message: {self.message}")
+
+        # Add shape information for numpy arrays
+        for field in self._fields:
+            value = getattr(self, field)
+            if isinstance(value, np.ndarray):
+                summary.append(f"  {field}: np.ndarray with shape {value.shape}")
+            elif isinstance(value, list) and value and isinstance(value[0], np.ndarray):
+                summary.append(f"  {field}: list of {len(value)} np.ndarray(s), first shape: {value[0].shape}")
+
+
+        return "EigenTrackingResults Summary:\n" + "\n".join(summary)
+
+    def save(self, filepath):
+        """
+        Saves the EigenTrackingResults object to a file using joblib.
+
+        Args:
+            filepath (str): The path to the file where the object will be saved.
+        """
+        joblib.dump(self, filepath)
+
+    @classmethod
+    def load(cls, filepath):
+        """
+        Loads an EigenTrackingResults object from a file.
+
+        Args:
+            filepath (str): The path to the file from which to load the object.
+
+        Returns:
+            EigenTrackingResults: The loaded object.
+        """
+        return joblib.load(filepath)
 
 def track_and_analyze_eigenvalue_decomposition(G, apply_correction=True):
     """
@@ -317,8 +369,11 @@ def track_and_analyze_eigenvalue_decomposition(G, apply_correction=True):
 
 
     # 2. Define the matrix functions A(t) and dA/dt
-    A_func = lambda t: np.exp(-t * D)
-    dA_func = lambda t: -D * np.exp(-t * D)
+    def A_func(t):
+        return np.exp(-t * D)
+
+    def dA_func(t):
+        return -D * A_func(t)
 
     # 3. Define time span and evaluation points
     t_start, t_end = 4.0, 1.0e-2 # Example time span
@@ -486,10 +541,10 @@ def plot_eigen_tracking_results(results: EigenTrackingResults, axes=None):
         np.ndarray: A numpy array of the used axes objects.
     """
     if axes is None:
-        fig, axes = plt.subplots(1, 3, figsize=(18, 6))
+        _, axes = plt.subplots(1, 3, figsize=(18, 6))
         show_plot = True
     else:
-        fig = axes[0].get_figure() # Get the figure from the provided axes
+        axes[0].get_figure() # Get the figure from the provided axes
         show_plot = False
 
     # 1. Plot Eigenvalue Trajectories

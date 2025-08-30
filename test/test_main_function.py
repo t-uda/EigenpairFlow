@@ -1,5 +1,3 @@
-import numpy as np
-import networkx as nx
 from eigenpairflow import track_and_analyze_eigenvalue_decomposition, create_n_partite_graph
 
 def test_track_and_analyze_eigenvalue_decomposition_runs():
