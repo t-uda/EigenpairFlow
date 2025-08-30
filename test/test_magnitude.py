@@ -1,5 +1,4 @@
 import numpy as np
-import pytest
 from eigenpairflow.magnitude import calculate_magnitudes
 
 def test_calculate_magnitudes():
