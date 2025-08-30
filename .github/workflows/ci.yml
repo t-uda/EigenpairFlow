@@ -32,6 +32,12 @@ jobs:
       matrix:
         python-version: ['3.9', '3.10', '3.11', '3.12']
         numpy-version: ['~1.21.0', '~1.24.0', 'latest']
+        exclude:
+          # NumPy ~1.21.0 may fail to build on Python 3.11+
+          - python-version: '3.11'
+            numpy-version: '~1.21.0'
+          - python-version: '3.12'
+            numpy-version: '~1.21.0'
 
     steps:
     - uses: actions/checkout@v4
