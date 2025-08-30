@@ -5,7 +5,6 @@ import networkx as nx
 from scipy.optimize import linear_sum_assignment
 
 from .types import EigenTrackingResults
-from .magnitude import calculate_magnitudes_and_pseudo
 
 def solve_symmetric_ode_system_linsolve(Lambda, F):
     """
@@ -295,8 +294,6 @@ def track_and_analyze_eigenvalue_decomposition(G, apply_correction=True):
             errors_before_correction=None
         )
 
-    n = D.shape[0]
-
     # 2. Define the matrix functions A(t) and dA/dt
     def A_func(t):
         return np.exp(-t * D)
@@ -353,8 +350,6 @@ def track_and_analyze_eigenvalue_decomposition(G, apply_correction=True):
     # 9. Initialize variables for corrected results
     corrected_Qs = None
     corrected_Lambdas = None
-    corrected_magnitudes = None
-    corrected_pseudo_magnitudes = None
     errors_after_correction = None
 
     # 10. Apply correction if requested
