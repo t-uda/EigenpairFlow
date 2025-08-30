@@ -299,8 +299,6 @@ def track_and_analyze_eigenvalue_decomposition(G, apply_correction=True, analyze
 
 
     # 2. Define the matrix functions A(t) and dA/dt
-
-    # 2. Define the matrix functions A(t) and dA/dt
     def A_func(t):
         return np.exp(-t * D)
 
@@ -348,8 +346,7 @@ def track_and_analyze_eigenvalue_decomposition(G, apply_correction=True, analyze
             zero_indices.append(i)
 
     # 8. Calculate original magnitudes, pseudo-magnitudes, and reconstruction errors
-    original_magnitudes = []
-    original_pseudo_magnitudes = []
+    original_magnitudes, original_pseudo_magnitudes = None, None
     errors_before_correction = []
 
     if analyze:
@@ -390,6 +387,7 @@ def track_and_analyze_eigenvalue_decomposition(G, apply_correction=True, analyze
             for i, t in enumerate(sol.t):
                 Q_t = corrected_Qs[i]
                 Lambda_t = corrected_Lambdas[i]
+                # Calculate corrected reconstruction error
                 A_t = A_func(t)
                 reconstructed_A = Q_t @ Lambda_t @ Q_t.T
                 error = np.linalg.norm(A_t - reconstructed_A, 'fro')
