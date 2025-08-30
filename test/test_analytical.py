@@ -80,7 +80,7 @@ def run_analytical_test(m, n):
     for i, j in G.edges():
         G.edges[i, j]['length'] = 1.0
 
-    results_numerical = track_and_analyze_eigenvalue_decomposition(G, apply_correction=False)
+    results_numerical, _ = track_and_analyze_eigenvalue_decomposition(G, apply_correction=False)
     assert results_numerical.success
 
     analytical_eigvals_func, analytical_eigvecs_func = get_analytical_eigenpairs_bipartite(m, n)

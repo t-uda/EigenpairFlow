@@ -18,7 +18,7 @@ def test_track_and_analyze_eigenvalue_decomposition_runs():
     G = create_n_partite_graph(partitions, lengths)
 
     # Run the analysis function
-    results = track_and_analyze_eigenvalue_decomposition(G, apply_correction=True)
+    results, _ = track_and_analyze_eigenvalue_decomposition(G, apply_correction=True)
 
     # Assert that the function ran successfully
     assert results.success
