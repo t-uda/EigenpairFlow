@@ -16,55 +16,52 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install Poetry
-        run: |
-          pip install poetry
-          poetry config virtualenvs.create false
+        run: pip install poetry
       - name: Install dependencies
         run: poetry install --with dev
       - name: Lint with ruff
         run: poetry run ruff check .
 
-  test:
+  test-numpy1x:
     needs: lint
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         python-version: ['3.9', '3.10', '3.11', '3.12']
-        numpy-version: ['~1.21.0', '~1.24.0', 'latest']
-        exclude:
-          # NumPy ~1.21.0 may fail to build on Python 3.11+
-          - python-version: '3.11'
-            numpy-version: '~1.21.0'
-          - python-version: '3.12'
-            numpy-version: '~1.21.0'
 
     steps:
     - uses: actions/checkout@v4
-
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
-
     - name: Install Poetry
-      run: |
-        pip install poetry
-        poetry config virtualenvs.create false
-
+      run: pip install poetry
     - name: Install dependencies
       run: poetry install --with dev
+    - name: Test with pytest
+      run: poetry run pytest
 
-    - name: Upgrade build tools
-      run: pip install --upgrade pip setuptools wheel
+  test-numpy2x:
+    needs: lint
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11', '3.12']
 
-    - name: Install specific NumPy version
-      if: matrix.numpy-version != 'latest'
-      run: poetry add "numpy@${{ matrix.numpy-version }}"
-
-    - name: Install latest NumPy version
-      if: matrix.numpy-version == 'latest'
-      run: poetry add numpy@latest
-
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install Poetry
+      run: pip install poetry
+    - name: Install NumPy 2.x
+      run: poetry add "numpy>=2.0"
+    - name: Install other dependencies
+      run: poetry install --with dev
     - name: Test with pytest
       run: poetry run pytest
