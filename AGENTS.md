@@ -43,6 +43,25 @@ This ensures that the project's dependencies remain consistent and reproducible.
 4.  **Verify Changes**:
     Before finalizing your work, review your changes to ensure they are within the scope of the assigned task and do not include any unintended modifications. A good way to do this is to review the output of `git diff`.
 
+## Notebook Development
+
+When working with notebooks for verification or demonstration, follow these guidelines:
+
+-   Add any necessary notebook development dependencies to the `[tool.poetry.group.dev.dependencies]` section in `pyproject.toml`.
+-   Ensure the development environment can be set up by running `poetry install`.
+-   The CI/CD pipeline does not run or test notebooks, but including tools for a better local development experience is encouraged.
+-   To make the Poetry environment's kernel available in Jupyter, add `ipykernel` as a dev dependency. You can then register the kernel using a command like `poetry run python -m ipykernel install --user --name=eigenpairflow`.
+
+### How to Use the Notebook Environment
+
+1.  **Launch JupyterLab:**
+    ```bash
+    poetry run jupyter lab
+    ```
+
+2.  **Select the Kernel:**
+    When creating a new notebook in JupyterLab, be sure to select the `eigenpairflow` kernel. This ensures that your notebook runs in the project's Poetry environment and has access to all required dependencies.
+
 ## Language and Style
 
 *   **Coding Style:** All Python code should adhere to the [PEP 8 style guide](https://peps.python.org/pep-0008/). The `ruff` pre-commit hook helps enforce this.
