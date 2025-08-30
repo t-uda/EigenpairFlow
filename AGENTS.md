@@ -1,0 +1,41 @@
+This file provides instructions for AI agents working on this repository.
+
+## Development Workflow
+
+Before committing any changes, please follow these steps to ensure code quality and consistency.
+
+1.  **Install dependencies:**
+    If this is your first time working on the project, or if dependencies have changed, install them using Poetry:
+    ```bash
+    poetry install
+    ```
+
+2.  **Format your code:**
+    Automatically format your code using `ruff`.
+    ```bash
+    poetry run ruff format .
+    ```
+
+3.  **Lint your code:**
+    Check for and automatically fix any linting issues with `ruff`.
+    ```bash
+    poetry run ruff check . --fix
+    ```
+
+4.  **Run tests:**
+    Execute the test suite using `pytest` to ensure your changes haven't introduced any regressions.
+    ```bash
+    poetry run pytest
+    ```
+
+5.  **Verify Changes**:
+    Before committing, review your changes to ensure they are within the scope of the assigned task and do not include any unintended modifications. A good way to do this is to review the output of `git diff`.
+
+6.  **Commit your changes:**
+    Once all checks pass and you have verified the scope of your changes, you can commit them.
+
+## Language and Style
+
+*   **Coding Style:** All Python code should adhere to the [PEP 8 style guide](https://peps.python.org/pep-0008/). `ruff` is configured to enforce this.
+*   **Docstrings:** Docstrings must be written in **Japanese**. They can include simple English terms where appropriate.
+*   **Comments:** Code comments other than docstrings can be written in English.
