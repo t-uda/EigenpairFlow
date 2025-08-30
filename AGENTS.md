@@ -16,6 +16,16 @@ poetry install
 pre-commit install
 ```
 
+### A Note on Managing Dependencies
+
+If you need to add, remove, or update dependencies in `pyproject.toml`, you must also update the `poetry.lock` file to reflect these changes. After modifying `pyproject.toml`, run the following command:
+
+```bash
+poetry lock
+```
+
+This ensures that the project's dependencies remain consistent and reproducible. After running the command, remember to commit both the `pyproject.toml` and `poetry.lock` files.
+
 ### 2. Development Workflow
 
 1.  **Edit Code:** Make your changes to the source code as required by your task.
