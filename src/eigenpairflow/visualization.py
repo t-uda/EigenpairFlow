@@ -5,9 +5,16 @@ from eigenpairflow.types import EigenTrackingResults
 
 def plot_eigenvalue_trajectories(results: EigenTrackingResults, ax=None):
     """
-    固有値の軌跡をプロットします。
+    追跡された各固有値の軌跡を、パラメータ t の関数としてプロットする。
 
-    Plots the eigenvalue trajectories.
+    横軸にパラメータ t（対数スケール）、縦軸に固有値 λ_i(t) をとり、
+    各固有値が t の変化に伴いどのように変動するかを視覚化する。
+
+    --- English ---
+    Plots the trajectory of each tracked eigenvalue as a function of the parameter t.
+
+    Visualizes how each eigenvalue λ_i(t) varies as t changes, with parameter t
+    on the x-axis (log scale) and the eigenvalue on the y-axis.
 
     Args:
         results (EigenTrackingResults): The namedtuple containing the tracking results.
@@ -41,9 +48,19 @@ def plot_eigenvalue_trajectories(results: EigenTrackingResults, ax=None):
 
 def plot_reconstruction_error(results: EigenTrackingResults, ax=None):
     """
-    再構成誤差をプロットします。
+    再構成誤差 ||A(t) - Q(t)Λ(t)Q(t)^T||_F の時間発展をプロットする。
 
-    Plots the reconstruction error.
+    横軸にパラメータ t（対数スケール）、縦軸にフロベニウスノルムで計算した
+    再構成誤差（対数スケール）をとり、追跡された固有値分解の精度を評価する。
+    補正が適用された場合、補正前後の誤差を比較して表示する。
+
+    --- English ---
+    Plots the evolution of the reconstruction error ||A(t) - Q(t)Λ(t)Q(t)^T||_F.
+
+    Evaluates the accuracy of the tracked eigenvalue decomposition by plotting the
+    reconstruction error, calculated using the Frobenius norm, on the y-axis (log scale)
+    against the parameter t on the x-axis (log scale). If correction was applied,
+    it compares the error before and after correction.
 
     Args:
         results (EigenTrackingResults): The namedtuple containing the tracking results.
@@ -78,9 +95,18 @@ def plot_reconstruction_error(results: EigenTrackingResults, ax=None):
 
 def plot_magnitudes(results: EigenTrackingResults, ax=None):
     """
-    マグニチュードと擬似マグニチュードをプロットします。
+    マグニチュードと擬似マグニチュードの軌跡をプロットする。
 
-    Plots the magnitude and pseudo-magnitude.
+    横軸にパラメータ t（対数スケール）、縦軸に値をとり、
+    マグニチュード（固有値がゼロに近い場合に発散する可能性のある量）と、
+    ゼロ固有値の寄与を取り除いた擬似マグニチュードを比較して表示する。
+
+    --- English ---
+    Plots the trajectories of the magnitude and pseudo-magnitude.
+
+    Compares the magnitude (a quantity that can diverge when eigenvalues are near zero)
+    and the pseudo-magnitude (which removes the contribution from zero eigenvalues)
+    by plotting their values on the y-axis against the parameter t on the x-axis (log scale).
 
     Args:
         results (EigenTrackingResults): The namedtuple containing the tracking results.
@@ -120,9 +146,16 @@ def plot_magnitudes(results: EigenTrackingResults, ax=None):
 
 def plot_eigen_tracking_results(results: EigenTrackingResults, axes=None):
     """
-    すべての固有値追跡結果をプロットします。
+    固有値追跡の全結果（軌跡、誤差、マグニチュード）を一つの図にまとめてプロットする。
 
-    Plots all eigenpair tracking results on a set of axes.
+    3つのサブプロットを生成し、それぞれに固有値の軌跡、再構成誤差、
+    そしてマグニチュードと擬似マグニチュードの比較を描画する。
+
+    --- English ---
+    Plots all results of the eigenvalue tracking (trajectories, error, and magnitudes) in a single figure.
+
+    Generates three subplots, displaying the eigenvalue trajectories, the reconstruction error,
+    and a comparison of magnitude vs. pseudo-magnitude, respectively.
 
     Args:
         results (EigenTrackingResults): The namedtuple containing the tracking results.
