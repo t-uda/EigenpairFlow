@@ -2,64 +2,33 @@ import numpy as np
 import scipy.linalg
 import scipy.integrate
 import networkx as nx
-from collections import namedtuple
-import joblib
 from scipy.optimize import linear_sum_assignment
-import matplotlib.pyplot as plt
+from .types import EigenTrackingResults
 
 def solve_symmetric_ode_system_linsolve(Lambda, F):
     """
-    実対称行列の発展方程式 F = dLambda + [H, Lambda] を、
-    H と dLambda の独立成分に関する連立一次方程式として厳密に解く。
-
-    Args:
-        Lambda (np.ndarray): n x n の対角固有値行列。
-        F (np.ndarray): n x n の対称行列 (Q^T * dA * Q)。
-
-    Returns:
-        tuple[np.ndarray, np.ndarray]: (H, dLambda_diag) のタプル。
-                                       H は歪対称行列。
-                                       dLambda_diag は固有値の変化率（対角成分のみのベクトル）。
+    Solves the evolution equation for symmetric matrices F = dLambda + [H, Lambda]
+    as a system of linear equations for the independent components of H and dLambda.
     """
     n = Lambda.shape[0]
-
-    # 1. 未知数の数を定義
     num_h_unknowns = n * (n - 1) // 2
     num_dlambda_unknowns = n
     total_unknowns = num_h_unknowns + num_dlambda_unknowns
 
-    # 2. 連立一次方程式 M*x = b を構成
     M = np.zeros((total_unknowns, total_unknowns))
     b = np.zeros(total_unknowns)
-
     lambdas = np.diag(Lambda)
 
-    # Numpyのインデックス機能を使い、手動ループを避ける
-    # eq_indices は上三角部分(対角含む)のインデックス (r, c) r<=c
-    # h_indices は厳密に上三角部分のインデックス (r, c) r<c
-    eq_indices_r, eq_indices_c = np.triu_indices(n)
     h_indices_r, h_indices_c = np.triu_indices(n, k=1)
+    b[:num_dlambda_unknowns] = np.diag(F)
+    b[num_dlambda_unknowns:] = F[h_indices_r, h_indices_c]
 
-    # b ベクトルを構成 (Fの上三角成分)
-    b[:num_dlambda_unknowns] = np.diag(F) # 対角成分 (n個)
-    b[num_dlambda_unknowns:] = F[h_indices_r, h_indices_c] # 非対角成分 (n(n-1)/2個)
-
-    # 係数行列 M を構成 (Mは対角行列になる)
-    # dLambdaに対応するブロック (係数は常に1)
     M_diag = np.ones(total_unknowns)
-
-    # Hに対応するブロック (係数は lambda_j - lambda_i)
     lambda_diffs = lambdas[h_indices_c] - lambdas[h_indices_r]
     M_diag[num_dlambda_unknowns:] = lambda_diffs
-
     np.fill_diagonal(M, M_diag)
 
-    # 3. 連立一次方程式を解く
-    # lstsq は悪条件（固有値の接近）に対して頑健
-    # x, residuals, rank, s = np.linalg.lstsq(M, b, rcond=None)
     x = np.linalg.lstsq(M, b, rcond=None)[0]
-
-    # 4. 解ベクトル x を H と dLambda に再構成
     dLambda_diag = x[:num_dlambda_unknowns]
     H_upper_vals = x[num_dlambda_unknowns:]
 
@@ -71,296 +40,113 @@ def solve_symmetric_ode_system_linsolve(Lambda, F):
 
 def symmetric_ode_derivative(t, y, n, dA_func):
     """
-    solve_ivp に渡すための微分方程式の右辺 f(t, y) を定義する。
-    y は [Q.flatten(), diag(Lambda)] を連結したベクトル。
+    Defines the right-hand side of the ODE for solve_ivp.
+    y is a flattened vector of [Q, diag(Lambda)].
     """
-    # 1. 状態ベクトルを行列 Q と対角行列 Lambda に復元
     Q = y[:n*n].reshape((n, n))
     lambdas = y[n*n:]
     Lambda = np.diag(lambdas)
 
-    # 2. dA/dt と F を計算
     dA = dA_func(t)
     F = Q.T @ dA @ Q
 
-    # 3. H と dLambda を計算
     H, dLambda_diag = solve_symmetric_ode_system_linsolve(Lambda, F)
-
-    # 4. dQ/dt を計算
     dQ = Q @ H
 
-    # 5. 結果を平坦化して単一のベクトルとして返す
-    dydt = np.concatenate([dQ.flatten(), dLambda_diag])
-    return dydt
+    return np.concatenate([dQ.flatten(), dLambda_diag])
 
 def track_eigen_decomposition(A_func, dA_func, t_span, t_eval, rtol=1e-5, atol=1e-8):
     """
-    実対称行列関数 A(t) の固有値分解を、常微分方程式を解くことで追跡する。
-
-    Args:
-        A_func (callable): 時刻 t を受け取り、行列 A(t) を返す関数。
-        dA_func (callable): 時刻 t を受け取り、行列の微分 dA/dt を返す関数。
-        t_span (tuple): 計算を開始・終了する時刻 (t_start, t_end)。
-        t_eval (np.ndarray): 結果を評価する時刻の配列。
-        rtol (float): solve_ivp用の相対許容誤差。
-        atol (float): solve_ivp用の絶対許容誤差。
-
-    Returns:
-        tuple: (list[np.ndarray], list[np.ndarray], object)
-               - Qs: 各評価時刻における直交固有ベクトル行列 Q のリスト。
-               - Lambdas: 各評価時刻における対角固有値行列 Lambda のリスト。
-               - sol: scipy.integrate.solve_ivp から返された結果オブジェクト。
+    Tracks the eigenvalue decomposition of a symmetric matrix function A(t) by solving an ODE.
     """
     t0 = t_span[0]
     A0 = A_func(t0)
     n = A0.shape[0]
 
-    # 初期条件: eighは実対称行列用に最適化されており、固有値と直交行列を返す
     lambdas0, Q0 = scipy.linalg.eigh(A0)
-
-    # 固有値と固有ベクトルをソートして、追跡中の順序を一定に保つ
     sort_indices = np.argsort(lambdas0)
     lambdas0 = lambdas0[sort_indices]
     Q0 = Q0[:, sort_indices]
 
-    # 初期状態ベクトル y0 を作成
     y0 = np.concatenate([Q0.flatten(), lambdas0])
 
-    # 高精度ソルバーの呼び出し (DOP853は高次のRunge-Kutta法)
     sol = scipy.integrate.solve_ivp(
-        symmetric_ode_derivative,
-        t_span,
-        y0,
-        method='DOP853',
-        t_eval=t_eval,
-        args=(n, dA_func),
-        rtol=rtol,
-        atol=atol,
-        dense_output=True
+        symmetric_ode_derivative, t_span, y0, method='DOP853', t_eval=t_eval,
+        args=(n, dA_func), rtol=rtol, atol=atol, dense_output=True
     )
     if not sol.success:
-        raise RuntimeError(f"Integration failed. {sol.message=}")
+        raise RuntimeError(f"Integration failed: {sol.message}")
 
-    # 結果をリストに復元
-    actual_t = sol.t
     Qs = [sol_y[:n*n].reshape((n, n)) for sol_y in sol.y.T]
     Lambdas = [np.diag(sol_y[n*n:]) for sol_y in sol.y.T]
 
     return Qs, Lambdas, sol
 
-def match_decompositions(predicted_eigvals, predicted_eigvecs,
-                         exact_eigvals, exact_eigvecs):
+def match_decompositions(predicted_eigvals, predicted_eigvecs, exact_eigvals, exact_eigvecs):
     """
-    正確な対角化分解を、予測された対角化分解にマッチさせる。
-
-    この関数は、ハンガリー法を用いて固有値の最適な対応付け（並べ替え）を
-    見つけ出し、その後、対応する固有ベクトル間の内積を計算して符号を揃える。
-    これにより、`eigh`のような関数の出力順序や符号の任意性に起因する不連続性を
-    解消し、時間積分の連続性を維持する。
-
-    Args:
-        predicted_eigvals (np.ndarray): 1D配列。予測された固有値。
-        predicted_eigvecs (np.ndarray): 2D配列。予測された固有ベクトル（列ベクトル）。
-        exact_eigvals (np.ndarray): 1D配列。正確に計算された固有値。
-        exact_eigvecs (np.ndarray): 2D配列。正確に計算された固有ベクトル（列ベクトル）。
-
-    Returns:
-        tuple[np.ndarray, np.ndarray]:
-            - matched_eigvals: `predicted_eigvals` の順序に並べ替えられた `exact_eigvals`。
-            - matched_eigvecs: `predicted_eigvecs` の順序と符号に合わせられた `exact_eigvecs`。
+    Matches an exact eigendecomposition to a predicted one using the Hungarian algorithm.
     """
-    # --- ステップ1: 固有値の最適な対応付け（並べ替え）を見つける ---
-    # コスト行列を計算する。C[i, j]は i 番目の予測値と j 番目の正確な値の差。
-    # このコストを最小化するようなペアリングを見つけることが目的。
     cost_matrix = np.abs(predicted_eigvals[:, np.newaxis] - exact_eigvals[np.newaxis, :])
-
-    # ハンガリー法（線形和割り当て問題）を解き、最適なペアリングを見つける
-    # pred_indices[i] は、exact_indices[i] に対応する
     pred_indices, exact_indices = linear_sum_assignment(cost_matrix)
 
-    # 並べ替えられた正確な値を格納する配列を準備
-    matched_eigvals = np.zeros_like(exact_eigvals)
-    matched_eigvecs = np.zeros_like(exact_eigvecs)
-
-    # 見つかった対応付けに従って、正確な値を並べ替える
-    # pred_indices は通常 0, 1, 2, ... となるので、exact_indices が置換を表す
     matched_eigvals = exact_eigvals[exact_indices]
     matched_eigvecs = exact_eigvecs[:, exact_indices]
 
-    # --- ステップ2: 対応する固有ベクトルの符号を合わせる ---
-    # 各々の対応するベクトル対の内積を計算する
-    # 内積が負の場合、ベクトルは反対方向を向いているため、一方の符号を反転させる
     for i in range(predicted_eigvecs.shape[1]):
-        dot_product = np.dot(predicted_eigvecs[:, i], matched_eigvecs[:, i])
-        if dot_product < 0.0:
+        if np.dot(predicted_eigvecs[:, i], matched_eigvecs[:, i]) < 0.0:
             matched_eigvecs[:, i] *= -1.0
 
     return matched_eigvals, matched_eigvecs
 
 def correct_trajectory(A_func, t_eval, Qs_ode, Lambdas_ode):
     """
-    ODEソルバーで追跡した固有値分解を、各時刻で正確に計算した分解に事後補正する。
-    ODE結果をガイドとして、正確な分解を並べ替え・符号合わせする。
-
-    Args:
-        A_func (callable): 時刻 t を受け取り、真の行列 A(t) を返す関数。
-        t_eval (np.ndarray): 評価時刻の1D配列。
-        Qs_ode (list of np.ndarray): ODEソルバーから得られた固有ベクトル行列のリスト。
-        Lambdas_ode (list of np.ndarray): ODEソルバーから得られた対角固有値行列のリスト。
-
-    Returns:
-        tuple[list[np.ndarray], list[np.ndarray]]:
-            - corrected_Qs: 補正された固有ベクトル行列のリスト。
-            - corrected_Lambdas: 補正された対角固有値行列のリスト。
+    Corrects the tracked eigendecomposition using exact calculations at each time step.
     """
     corrected_Qs = []
     corrected_Lambdas = []
-
     for i, t in enumerate(t_eval):
-        # 1. その時刻における真の行列 A_t を計算
         A_t = A_func(t)
-
-        # 2. A_t の正確な固有値分解を計算
         exact_eigvals, exact_eigvecs = scipy.linalg.eigh(A_t)
 
-        # 3. match_decompositions を用いて、正確な分解をODE結果にマッチさせる
-        # ODE結果を「予測」、正確な計算を「正確」として渡す
-        # Lambdas_ode は対角行列なので、固有値を取り出す
         predicted_eigvals = np.diag(Lambdas_ode[i])
         predicted_eigvecs = Qs_ode[i]
 
         matched_eigvals, matched_eigvecs = match_decompositions(
-            predicted_eigvals,
-            predicted_eigvecs,
-            exact_eigvals,
-            exact_eigvecs
+            predicted_eigvals, predicted_eigvecs, exact_eigvals, exact_eigvecs
         )
 
-        # 4. 補正結果をリストに追加
         corrected_Qs.append(matched_eigvecs)
-        corrected_Lambdas.append(np.diag(matched_eigvals)) # 対角行列に戻す
+        corrected_Lambdas.append(np.diag(matched_eigvals))
 
     return corrected_Qs, corrected_Lambdas
 
 def create_n_partite_graph(partition_sizes, edge_lengths_dict):
     """
-    Creates an n-partite graph based on partition sizes and edge lengths between partitions.
-
-    Args:
-        partition_sizes (list): A list of integers representing the number of nodes in each partition.
-        edge_lengths_dict (dict): A dictionary where keys are tuples of partition indices (i, j)
-                                  and values are the lengths of edges between nodes in partition i and partition j.
-
-    Returns:
-        nx.Graph: The constructed n-partite graph.
+    Creates an n-partite graph.
     """
     G = nx.Graph()
     node_id = 1
     partition_nodes = []
-
-    # Add nodes to each partition
     for i, size in enumerate(partition_sizes):
         nodes_in_partition = list(range(node_id, node_id + size))
         G.add_nodes_from(nodes_in_partition, type=f'p{i}')
         partition_nodes.append(nodes_in_partition)
         node_id += size
 
-    # Add edges between partitions with specified lengths
     for (p1_idx, p2_idx), length in edge_lengths_dict.items():
         if p1_idx < len(partition_sizes) and p2_idx < len(partition_sizes) and p1_idx != p2_idx:
             for u in partition_nodes[p1_idx]:
                 for v in partition_nodes[p2_idx]:
                     G.add_edge(u, v, length=length, weight=1/length)
-
     return G
 
-_EigenTrackingResults = namedtuple(
-    '_EigenTrackingResults',
-    [
-        't_eval',
-        'Qs',
-        'Lambdas',
-        'magnitudes',
-        'pseudo_magnitudes',
-        'errors',
-        'zero_indices',
-        'success',
-        'message',
-        'state',
-        'errors_before_correction' # This will be None if correction is not applied
-    ]
-)
-
-class EigenTrackingResults(_EigenTrackingResults):
+def track_and_analyze_eigenvalue_decomposition(G, t_start=4.0, t_end=1.0e-2, num_t=1000, apply_correction=True):
     """
-    Results of eigenpair tracking.
-
-    This class extends the namedtuple _EigenTrackingResults to provide
-    additional methods for a better user experience, such as a custom
-    string representation and serialization methods.
+    Performs eigenvalue tracking and analysis for a graph's distance matrix.
     """
-    def __str__(self):
-        """
-        Provides a concise summary of the tracking results.
-        """
-        if not self.success:
-            return f"EigenTracking failed: {self.message}"
-
-        summary = []
-        summary.append(f"success: {self.success}")
-        summary.append(f"message: {self.message}")
-
-        # Add shape information for numpy arrays
-        for field in self._fields:
-            value = getattr(self, field)
-            if isinstance(value, np.ndarray):
-                summary.append(f"  {field}: np.ndarray with shape {value.shape}")
-            elif isinstance(value, list) and value and isinstance(value[0], np.ndarray):
-                summary.append(f"  {field}: list of {len(value)} np.ndarray(s), first shape: {value[0].shape}")
-
-
-        return "EigenTrackingResults Summary:\n" + "\n".join(summary)
-
-    def save(self, filepath):
-        """
-        Saves the EigenTrackingResults object to a file using joblib.
-
-        Args:
-            filepath (str): The path to the file where the object will be saved.
-        """
-        joblib.dump(self, filepath)
-
-    @classmethod
-    def load(cls, filepath):
-        """
-        Loads an EigenTrackingResults object from a file.
-
-        Args:
-            filepath (str): The path to the file from which to load the object.
-
-        Returns:
-            EigenTrackingResults: The loaded object.
-        """
-        return joblib.load(filepath)
-
-def track_and_analyze_eigenvalue_decomposition(G, apply_correction=True):
-    """
-    Performs eigenvalue tracking and analysis for a graph's distance matrix
-    exponentiated, returning results in a namedtuple.
-
-    Args:
-        G (nx.Graph): The input NetworkX graph.
-        apply_correction (bool): Whether to apply post-hoc correction using
-                                 exact diagonalization at each time step.
-
-    Returns:
-        EigenTrackingResults: A namedtuple containing the results.
-    """
-    # 1. Compute the distance matrix D from the input graph G
     try:
         D = np.array(nx.floyd_warshall_numpy(G, weight='length'))
     except nx.NetworkXNoPath:
-         # Handle disconnected graphs if necessary, or let it propagate
          return EigenTrackingResults(
             t_eval=None, Qs=None, Lambdas=None, magnitudes=None,
             pseudo_magnitudes=None, errors=None, zero_indices=None,
@@ -368,232 +154,77 @@ def track_and_analyze_eigenvalue_decomposition(G, apply_correction=True):
             errors_before_correction=None
         )
 
-
-    # 2. Define the matrix functions A(t) and dA/dt
     A_func = lambda t: np.exp(-t * D)
     dA_func = lambda t: -D * np.exp(-t * D)
-
-    # 3. Define time span and evaluation points
-    t_start, t_end = 4.0, 1.0e-2 # Example time span
-    t_eval = np.geomspace(t_start, t_end, 10000)
-
-    # 4. Call the track_eigen_decomposition function
-    Qs_ode, Lambdas_ode, sol = None, None, None
-    success = False
-    message = "Tracking failed."
-    state = None
+    t_eval = np.geomspace(t_start, t_end, num_t)
 
     try:
         Qs_ode, Lambdas_ode, sol = track_eigen_decomposition(
             A_func, dA_func, (t_start, t_end), t_eval, rtol=1e-13, atol=1e-12
         )
-        success = sol.success
-        message = sol.message
-        state = sol.status
+        success, message, state = sol.success, sol.message, sol.status
     except RuntimeError as e:
-        message = f"Tracking failed: {e}"
+        success, message, state = False, f"Tracking failed: {e}", None
 
-    # If tracking failed, return early
     if not success:
          return EigenTrackingResults(
-            t_eval=sol.t if sol else None, Qs=None, Lambdas=None, magnitudes=None,
+            t_eval=sol.t if 'sol' in locals() else None, Qs=None, Lambdas=None, magnitudes=None,
             pseudo_magnitudes=None, errors=None, zero_indices=None,
             success=success, message=message, state=state,
             errors_before_correction=None
         )
 
-
-    # 6. Extract the original eigenvalue traces
     eigenvalues_traces = np.array([np.diag(L) for L in Lambdas_ode])
+    zero_indices = [i for i, l in enumerate(eigenvalues_traces.T) if np.amin(l) < 0.0 < np.amax(l)]
 
-    # 7. Identify indices of eigenvalues that cross zero
-    zero_indices = []
-    for i in range(eigenvalues_traces.shape[1]):
-        lambda_i = eigenvalues_traces[:, i]
-        if np.amin(lambda_i) < 0.0 < np.amax(lambda_i):
-            zero_indices.append(i)
-
-    # 8. Calculate original magnitudes, pseudo-magnitudes, and reconstruction errors
-    original_magnitudes = []
-    original_pseudo_magnitudes = []
-    errors_before_correction = []
-
+    magnitudes, pseudo_magnitudes, errors = [], [], []
     for i, t in enumerate(sol.t):
-        Q_t = Qs_ode[i]
-        Lambda_t = Lambdas_ode[i]
-
+        Q_t, Lambda_t = Qs_ode[i], Lambdas_ode[i]
         Lambda_inverse = np.linalg.inv(Lambda_t)
-
         v = Q_t.T @ np.ones(D.shape[0])
-
-        mag = v.T @ Lambda_inverse @ v
-        original_magnitudes.append(mag)
+        magnitudes.append(v.T @ Lambda_inverse @ v)
 
         pseudo_Lambda_inverse = Lambda_inverse.copy()
         if zero_indices:
             pseudo_Lambda_inverse[zero_indices, zero_indices] = 0
-
-        pseudo_mag = v.T @ pseudo_Lambda_inverse @ v
-        original_pseudo_magnitudes.append(pseudo_mag)
+        pseudo_magnitudes.append(v.T @ pseudo_Lambda_inverse @ v)
 
         A_t = A_func(t)
         reconstructed_A = Q_t @ Lambda_t @ Q_t.T
-        error = np.linalg.norm(A_t - reconstructed_A, 'fro')
-        errors_before_correction.append(error)
+        errors.append(np.linalg.norm(A_t - reconstructed_A, 'fro'))
 
-    # 9. Initialize variables for corrected results
-    corrected_Qs = None
-    corrected_Lambdas = None
-    corrected_magnitudes = None
-    corrected_pseudo_magnitudes = None
-    errors_after_correction = None
+    results_data = {
+        't_eval': sol.t, 'Qs': Qs_ode, 'Lambdas': Lambdas_ode,
+        'magnitudes': magnitudes, 'pseudo_magnitudes': pseudo_magnitudes,
+        'errors': errors, 'zero_indices': zero_indices, 'success': success,
+        'message': message, 'state': state, 'errors_before_correction': None
+    }
 
-    # 10. Apply correction if requested
     if apply_correction:
         try:
-            corrected_Qs, corrected_Lambdas = correct_trajectory(
-                A_func, sol.t, Qs_ode, Lambdas_ode
-            )
-
-            # Calculate corrected magnitudes and pseudo-magnitudes
-            corrected_magnitudes = []
-            corrected_pseudo_magnitudes = []
-            errors_after_correction = []
-
+            corrected_Qs, corrected_Lambdas = correct_trajectory(A_func, sol.t, Qs_ode, Lambdas_ode)
+            corrected_magnitudes, corrected_pseudo_magnitudes, corrected_errors = [], [], []
             for i, t in enumerate(sol.t):
-                Q_t = corrected_Qs[i]
-                Lambda_t = corrected_Lambdas[i]
-
+                Q_t, Lambda_t = corrected_Qs[i], corrected_Lambdas[i]
                 Lambda_inverse = np.linalg.inv(Lambda_t)
-
                 v = Q_t.T @ np.ones(D.shape[0])
-
-                mag = v.T @ Lambda_inverse @ v
-                corrected_magnitudes.append(mag)
+                corrected_magnitudes.append(v.T @ Lambda_inverse @ v)
 
                 pseudo_Lambda_inverse = Lambda_inverse.copy()
                 if zero_indices:
                     pseudo_Lambda_inverse[zero_indices, zero_indices] = 0
+                corrected_pseudo_magnitudes.append(v.T @ pseudo_Lambda_inverse @ v)
 
-                pseudo_mag = v.T @ pseudo_Lambda_inverse @ v
-                corrected_pseudo_magnitudes.append(pseudo_mag)
-
-                # Calculate corrected reconstruction error
                 A_t = A_func(t)
                 reconstructed_A = Q_t @ Lambda_t @ Q_t.T
-                error = np.linalg.norm(A_t - reconstructed_A, 'fro')
-                errors_after_correction.append(error)
+                corrected_errors.append(np.linalg.norm(A_t - reconstructed_A, 'fro'))
 
+            results_data.update({
+                'Qs': corrected_Qs, 'Lambdas': corrected_Lambdas, 'magnitudes': corrected_magnitudes,
+                'pseudo_magnitudes': corrected_pseudo_magnitudes, 'errors': corrected_errors,
+                'errors_before_correction': errors
+            })
         except Exception as e:
             print(f"Correction failed: {e}")
-            # Proceed with original results if correction fails
-            apply_correction = False # Revert to original results
 
-
-    # 11. Select results based on apply_correction flag
-    if apply_correction:
-        final_Qs = corrected_Qs
-        final_Lambdas = corrected_Lambdas
-        final_magnitudes = corrected_magnitudes
-        final_pseudo_magnitudes = corrected_pseudo_magnitudes
-        final_errors = errors_after_correction
-        final_errors_before_correction = errors_before_correction
-    else:
-        final_Qs = Qs_ode
-        final_Lambdas = Lambdas_ode
-        final_magnitudes = original_magnitudes
-        final_pseudo_magnitudes = original_pseudo_magnitudes
-        final_errors = errors_before_correction
-        final_errors_before_correction = None # Set to None if correction wasn't applied
-
-
-    # 12. Populate the EigenTrackingResults namedtuple
-    results = EigenTrackingResults(
-        t_eval=sol.t,
-        Qs=final_Qs,
-        Lambdas=final_Lambdas,
-        magnitudes=final_magnitudes,
-        pseudo_magnitudes=final_pseudo_magnitudes,
-        errors=final_errors,
-        zero_indices=zero_indices,
-        success=success,
-        message=message,
-        state=state,
-        errors_before_correction=final_errors_before_correction # Include only if correction applied
-    )
-
-    # 13. Return the namedtuple
-    return results
-
-def plot_eigen_tracking_results(results: EigenTrackingResults, axes=None):
-    """
-    Plots the results from the EigenTrackingResults namedtuple.
-
-    Args:
-        results (EigenTrackingResults): The namedtuple containing the tracking results.
-        axes (np.ndarray, optional): A numpy array of matplotlib axes objects
-                                     (e.g., from plt.subplots(1, 3)).
-                                     If None, a new figure and axes are created.
-
-    Returns:
-        np.ndarray: A numpy array of the used axes objects.
-    """
-    if axes is None:
-        fig, axes = plt.subplots(1, 3, figsize=(18, 6))
-        show_plot = True
-    else:
-        fig = axes[0].get_figure() # Get the figure from the provided axes
-        show_plot = False
-
-    # 1. Plot Eigenvalue Trajectories
-    ax1 = axes[0]
-    if results.Lambdas is not None and results.t_eval is not None:
-        eigenvalues_traces = np.array([np.diag(L) for L in results.Lambdas])
-        for i in range(eigenvalues_traces.shape[1]):
-            ax1.plot(results.t_eval, eigenvalues_traces[:, i], label=f'λ_{i+1}(t)')
-        ax1.set_title('Eigenvalue Trajectories')
-        ax1.set_xlabel('Parameter t')
-        ax1.set_xscale('log')
-        ax1.set_ylabel('Eigenvalues')
-        ax1.legend()
-        ax1.grid(True)
-
-    # 2. Plot Reconstruction Error
-    ax2 = axes[1]
-    if results.errors is not None and results.t_eval is not None:
-        ax2.semilogy(results.t_eval, results.errors, label='Reconstruction Error', color='crimson')
-        if results.errors_before_correction is not None:
-             ax2.semilogy(results.t_eval, results.errors_before_correction, label='Original ODE Error', linestyle='--', color='darkblue')
-
-        ax2.set_title('Reconstruction Error')
-        ax2.set_xlabel('Parameter t')
-        ax2.set_xscale('log')
-        ax2.set_ylabel(r'$||A(t) - Q(t)\Lambda(t)Q(t)^T||_F$ (log scale)')
-        ax2.legend()
-        ax2.grid(True)
-
-
-    # 3. Plot Magnitude vs Pseudo-Magnitude
-    ax3 = axes[2]
-    if results.magnitudes is not None and results.pseudo_magnitudes is not None and results.t_eval is not None:
-        ax3.plot(results.t_eval, results.magnitudes, color='darkred', label='Magnitude')
-        ax3.plot(results.t_eval, results.pseudo_magnitudes, color='darkgreen', label='Pseudo-Magnitude')
-
-        ax3.set_title('Magnitude vs Pseudo-Magnitude')
-        ax3.set_xlabel('Parameter t')
-        ax3.set_xscale('log')
-        ax3.set_ylabel('Value')
-        # Set a reasonable y-axis limit
-        y_min = -1
-        y_max = np.amax(results.pseudo_magnitudes) + 2
-        ax3.set_ylim(y_min, y_max)
-
-        ax3.legend()
-        ax3.grid(True)
-
-    plt.tight_layout()
-
-    if show_plot:
-        plt.show()
-
-    return axes
+    return EigenTrackingResults(**results_data)
