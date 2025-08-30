@@ -5,6 +5,7 @@ import networkx as nx
 from scipy.optimize import linear_sum_assignment
 
 from .types import EigenTrackingResults
+from .magnitude import calculate_magnitudes_and_pseudo
 
 def solve_symmetric_ode_system_linsolve(Lambda, F):
     """
@@ -272,45 +273,17 @@ def create_n_partite_graph(partition_sizes, edge_lengths_dict):
 
     return G
 
-def track_and_analyze_eigenvalue_decomposition(G, apply_correction=True):
+def track_and_analyze_eigenvalue_decomposition(G, apply_correction=True, analyze=True):
     """
     グラフの距離行列から構成される行列 A(t) = exp(-tD) の固有値分解を追跡・分析する。
 
-    この関数は、一連の処理をまとめて実行する。
-    1. グラフ G からフロイド・ワーシャル法で距離行列 D を計算する。
-    2. パラメータ t に依存する行列 A(t) = exp(-tD) とその微分 dA/dt を定義する。
-    3. 常微分方程式を解くことで、A(t) の固有値と固有ベクトルの軌跡を追跡する (`track_eigen_decomposition`)。
-    4. (オプション) 各時刻で A(t) を厳密に対角化し、その結果を使ってODEソルバーからの軌跡を補正する (`correct_trajectory`)。
-       これにより、数値誤差の累積を防ぎ、精度を向上させる。
-    5. 追跡された固有対を用いて、関連する物理量（マグニチュード、擬マグニチュード）および再構成誤差を計算する。
-    6. 全ての結果を `EigenTrackingResults` オブジェクトにまとめて返す。
-
     Args:
         G (nx.Graph): 解析対象の重み付きグラフ。辺には 'length' 属性が必要。
-        apply_correction (bool): 軌跡の事後補正を適用するかどうか。デフォルトは True。
+        apply_correction (bool): 軌跡の事後補正を適用するかどうか。
+        analyze (bool): マグニチュード解析を適用するかどうか。
 
     Returns:
         EigenTrackingResults: 追跡と分析の結果を格納した名前付きタプル。
-                          成功したかどうか、メッセージ、各時刻の固有対、計算された物理量などが含まれる。
-
-    --- English ---
-    Tracks and analyzes the eigenvalue decomposition of the matrix A(t) = exp(-tD) derived from a graph's distance matrix.
-
-    This function performs a complete workflow:
-    1. Computes the distance matrix D from graph G using the Floyd-Warshall algorithm.
-    2. Defines the parameter-dependent matrix A(t) = exp(-tD) and its derivative dA/dt.
-    3. Tracks the eigenvalue and eigenvector trajectories of A(t) by solving an ordinary differential equation (`track_eigen_decomposition`).
-    4. (Optional) Applies a post-hoc correction to the trajectory from the ODE solver by using exact diagonalization of A(t) at each time step (`correct_trajectory`). This mitigates the accumulation of numerical errors and improves accuracy.
-    5. Computes relevant physical quantities (magnitude, pseudo-magnitude) and reconstruction error using the tracked eigenpairs.
-    6. Returns all results consolidated into an `EigenTrackingResults` object.
-
-    Args:
-        G (nx.Graph): The weighted input graph. Edges must have a 'length' attribute.
-        apply_correction (bool): Whether to apply the post-hoc trajectory correction. Defaults to True.
-
-    Returns:
-        EigenTrackingResults: A named tuple containing the results of the tracking and analysis,
-                          including success status, messages, eigenpairs at each time step, and computed quantities.
     """
     # 1. Compute the distance matrix D from the input graph G
     try:
@@ -318,12 +291,12 @@ def track_and_analyze_eigenvalue_decomposition(G, apply_correction=True):
     except nx.NetworkXNoPath:
          # Handle disconnected graphs if necessary, or let it propagate
          return EigenTrackingResults(
-            t_eval=None, Qs=None, Lambdas=None, magnitudes=None,
-            pseudo_magnitudes=None, errors=None, zero_indices=None,
+            t_eval=None, Qs=None, Lambdas=None, errors=None, zero_indices=None,
             success=False, message="Graph is disconnected.", state=None,
             errors_before_correction=None
         )
 
+    n = D.shape[0]
 
     # 2. Define the matrix functions A(t) and dA/dt
     def A_func(t):
@@ -355,8 +328,7 @@ def track_and_analyze_eigenvalue_decomposition(G, apply_correction=True):
     # If tracking failed, return early
     if not success:
          return EigenTrackingResults(
-            t_eval=sol.t if sol else None, Qs=None, Lambdas=None, magnitudes=None,
-            pseudo_magnitudes=None, errors=None, zero_indices=None,
+            t_eval=sol.t if sol else None, Qs=None, Lambdas=None, errors=None, zero_indices=None,
             success=success, message=message, state=state,
             errors_before_correction=None
         )
@@ -372,113 +344,51 @@ def track_and_analyze_eigenvalue_decomposition(G, apply_correction=True):
         if np.amin(lambda_i) < 0.0 < np.amax(lambda_i):
             zero_indices.append(i)
 
-    # 8. Calculate original magnitudes, pseudo-magnitudes, and reconstruction errors
-    original_magnitudes = []
-    original_pseudo_magnitudes = []
+    # 8. Calculate reconstruction errors
     errors_before_correction = []
-
     for i, t in enumerate(sol.t):
         Q_t = Qs_ode[i]
         Lambda_t = Lambdas_ode[i]
-
-        Lambda_inverse = np.linalg.inv(Lambda_t)
-
-        v = Q_t.T @ np.ones(D.shape[0])
-
-        mag = v.T @ Lambda_inverse @ v
-        original_magnitudes.append(mag)
-
-        pseudo_Lambda_inverse = Lambda_inverse.copy()
-        if zero_indices:
-            pseudo_Lambda_inverse[zero_indices, zero_indices] = 0
-
-        pseudo_mag = v.T @ pseudo_Lambda_inverse @ v
-        original_pseudo_magnitudes.append(pseudo_mag)
-
         A_t = A_func(t)
         reconstructed_A = Q_t @ Lambda_t @ Q_t.T
         error = np.linalg.norm(A_t - reconstructed_A, 'fro')
         errors_before_correction.append(error)
 
     # 9. Initialize variables for corrected results
-    corrected_Qs = None
-    corrected_Lambdas = None
-    corrected_magnitudes = None
-    corrected_pseudo_magnitudes = None
+    corrected_Qs, corrected_Lambdas = None, None
     errors_after_correction = None
 
     # 10. Apply correction if requested
     if apply_correction:
         try:
-            corrected_Qs, corrected_Lambdas = correct_trajectory(
-                A_func, sol.t, Qs_ode, Lambdas_ode
-            )
-
-            # Calculate corrected magnitudes and pseudo-magnitudes
-            corrected_magnitudes = []
-            corrected_pseudo_magnitudes = []
+            corrected_Qs, corrected_Lambdas = correct_trajectory(A_func, sol.t, Qs_ode, Lambdas_ode)
             errors_after_correction = []
-
             for i, t in enumerate(sol.t):
-                Q_t = corrected_Qs[i]
-                Lambda_t = corrected_Lambdas[i]
-
-                Lambda_inverse = np.linalg.inv(Lambda_t)
-
-                v = Q_t.T @ np.ones(D.shape[0])
-
-                mag = v.T @ Lambda_inverse @ v
-                corrected_magnitudes.append(mag)
-
-                pseudo_Lambda_inverse = Lambda_inverse.copy()
-                if zero_indices:
-                    pseudo_Lambda_inverse[zero_indices, zero_indices] = 0
-
-                pseudo_mag = v.T @ pseudo_Lambda_inverse @ v
-                corrected_pseudo_magnitudes.append(pseudo_mag)
-
-                # Calculate corrected reconstruction error
+                Q_t, Lambda_t = corrected_Qs[i], corrected_Lambdas[i]
                 A_t = A_func(t)
                 reconstructed_A = Q_t @ Lambda_t @ Q_t.T
                 error = np.linalg.norm(A_t - reconstructed_A, 'fro')
                 errors_after_correction.append(error)
-
         except Exception as e:
             print(f"Correction failed: {e}")
-            # Proceed with original results if correction fails
-            apply_correction = False # Revert to original results
-
+            apply_correction = False
 
     # 11. Select results based on apply_correction flag
-    if apply_correction:
-        final_Qs = corrected_Qs
-        final_Lambdas = corrected_Lambdas
-        final_magnitudes = corrected_magnitudes
-        final_pseudo_magnitudes = corrected_pseudo_magnitudes
-        final_errors = errors_after_correction
-        final_errors_before_correction = errors_before_correction
-    else:
-        final_Qs = Qs_ode
-        final_Lambdas = Lambdas_ode
-        final_magnitudes = original_magnitudes
-        final_pseudo_magnitudes = original_pseudo_magnitudes
-        final_errors = errors_before_correction
-        final_errors_before_correction = None # Set to None if correction wasn't applied
-
+    final_Qs = corrected_Qs if apply_correction else Qs_ode
+    final_Lambdas = corrected_Lambdas if apply_correction else Lambdas_ode
+    final_errors = errors_after_correction if apply_correction else errors_before_correction
 
     # 12. Populate the EigenTrackingResults namedtuple
     results = EigenTrackingResults(
         t_eval=sol.t,
         Qs=final_Qs,
         Lambdas=final_Lambdas,
-        magnitudes=final_magnitudes,
-        pseudo_magnitudes=final_pseudo_magnitudes,
-        errors=final_errors,
+        errors=np.array(final_errors),
         zero_indices=zero_indices,
         success=success,
         message=message,
         state=state,
-        errors_before_correction=final_errors_before_correction # Include only if correction applied
+        errors_before_correction=np.array(errors_before_correction) if apply_correction else None
     )
 
     # 13. Return the namedtuple
