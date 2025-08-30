@@ -16,6 +16,15 @@ poetry install
 pre-commit install
 ```
 
+### Important Notes for Agents
+
+- **Environment Persistence**: The setup commands above must be run in any new terminal session or environment. The pre-commit hooks will not work if they are not installed in the current context.
+- **Verify Installation**: After running the setup, you **must** verify that the hooks are working correctly by running the following command:
+  ```bash
+  pre-commit run --all-files
+  ```
+  This command will run all configured checks against all files in the repository. It should pass without errors on a clean checkout. If it fails, it indicates a problem with the setup or the existing codebase that must be resolved before proceeding.
+
 ### A Note on Managing Dependencies
 
 If you need to add, remove, or update dependencies in `pyproject.toml`, you must also update the `poetry.lock` file to reflect these changes. After modifying `pyproject.toml`, run the following command:

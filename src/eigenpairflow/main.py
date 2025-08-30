@@ -6,6 +6,7 @@ from scipy.optimize import linear_sum_assignment
 
 from .types import EigenTrackingResults
 
+
 def solve_symmetric_ode_system_linsolve(Lambda, F):
     """
     実対称行列の発展方程式 F = dLambda + [H, Lambda] を、
@@ -40,8 +41,8 @@ def solve_symmetric_ode_system_linsolve(Lambda, F):
     h_indices_r, h_indices_c = np.triu_indices(n, k=1)
 
     # b ベクトルを構成 (Fの上三角成分)
-    b[:num_dlambda_unknowns] = np.diag(F) # 対角成分 (n個)
-    b[num_dlambda_unknowns:] = F[h_indices_r, h_indices_c] # 非対角成分 (n(n-1)/2個)
+    b[:num_dlambda_unknowns] = np.diag(F)  # 対角成分 (n個)
+    b[num_dlambda_unknowns:] = F[h_indices_r, h_indices_c]  # 非対角成分 (n(n-1)/2個)
 
     # 係数行列 M を構成 (Mは対角行列になる)
     # dLambdaに対応するブロック (係数は常に1)
@@ -68,14 +69,15 @@ def solve_symmetric_ode_system_linsolve(Lambda, F):
 
     return H, dLambda_diag
 
+
 def symmetric_ode_derivative(t, y, n, dA_func):
     """
     solve_ivp に渡すための微分方程式の右辺 f(t, y) を定義する。
     y は [Q.flatten(), diag(Lambda)] を連結したベクトル。
     """
     # 1. 状態ベクトルを行列 Q と対角行列 Lambda に復元
-    Q = y[:n*n].reshape((n, n))
-    lambdas = y[n*n:]
+    Q = y[: n * n].reshape((n, n))
+    lambdas = y[n * n :]
     Lambda = np.diag(lambdas)
 
     # 2. dA/dt と F を計算
@@ -91,6 +93,7 @@ def symmetric_ode_derivative(t, y, n, dA_func):
     # 5. 結果を平坦化して単一のベクトルとして返す
     dydt = np.concatenate([dQ.flatten(), dLambda_diag])
     return dydt
+
 
 def track_eigen_decomposition(A_func, dA_func, t_span, t_eval, rtol=1e-5, atol=1e-8):
     """
@@ -130,7 +133,7 @@ def track_eigen_decomposition(A_func, dA_func, t_span, t_eval, rtol=1e-5, atol=1
         symmetric_ode_derivative,
         t_span,
         y0,
-        method='DOP853',
+        method="DOP853",
         t_eval=t_eval,
         args=(n, dA_func),
         rtol=rtol,
@@ -141,13 +144,15 @@ def track_eigen_decomposition(A_func, dA_func, t_span, t_eval, rtol=1e-5, atol=1
         raise RuntimeError(f"Integration failed. {sol.message=}")
 
     # 結果をリストに復元
-    Qs = [sol_y[:n*n].reshape((n, n)) for sol_y in sol.y.T]
-    Lambdas = [np.diag(sol_y[n*n:]) for sol_y in sol.y.T]
+    Qs = [sol_y[: n * n].reshape((n, n)) for sol_y in sol.y.T]
+    Lambdas = [np.diag(sol_y[n * n :]) for sol_y in sol.y.T]
 
     return Qs, Lambdas, sol
 
-def match_decompositions(predicted_eigvals, predicted_eigvecs,
-                         exact_eigvals, exact_eigvecs):
+
+def match_decompositions(
+    predicted_eigvals, predicted_eigvecs, exact_eigvals, exact_eigvecs
+):
     """
     正確な対角化分解を、予測された対角化分解にマッチさせる。
 
@@ -170,7 +175,9 @@ def match_decompositions(predicted_eigvals, predicted_eigvecs,
     # --- ステップ1: 固有値の最適な対応付け（並べ替え）を見つける ---
     # コスト行列を計算する。C[i, j]は i 番目の予測値と j 番目の正確な値の差。
     # このコストを最小化するようなペアリングを見つけることが目的。
-    cost_matrix = np.abs(predicted_eigvals[:, np.newaxis] - exact_eigvals[np.newaxis, :])
+    cost_matrix = np.abs(
+        predicted_eigvals[:, np.newaxis] - exact_eigvals[np.newaxis, :]
+    )
 
     # ハンガリー法（線形和割り当て問題）を解き、最適なペアリングを見つける
     # pred_indices[i] は、exact_indices[i] に対応する
@@ -194,6 +201,7 @@ def match_decompositions(predicted_eigvals, predicted_eigvecs,
             matched_eigvecs[:, i] *= -1.0
 
     return matched_eigvals, matched_eigvecs
+
 
 def correct_trajectory(A_func, t_eval, Qs_ode, Lambdas_ode):
     """
@@ -228,17 +236,15 @@ def correct_trajectory(A_func, t_eval, Qs_ode, Lambdas_ode):
         predicted_eigvecs = Qs_ode[i]
 
         matched_eigvals, matched_eigvecs = match_decompositions(
-            predicted_eigvals,
-            predicted_eigvecs,
-            exact_eigvals,
-            exact_eigvecs
+            predicted_eigvals, predicted_eigvecs, exact_eigvals, exact_eigvecs
         )
 
         # 4. 補正結果をリストに追加
         corrected_Qs.append(matched_eigvecs)
-        corrected_Lambdas.append(np.diag(matched_eigvals)) # 対角行列に戻す
+        corrected_Lambdas.append(np.diag(matched_eigvals))  # 対角行列に戻す
 
     return corrected_Qs, corrected_Lambdas
+
 
 def create_n_partite_graph(partition_sizes, edge_lengths_dict):
     """
@@ -259,18 +265,23 @@ def create_n_partite_graph(partition_sizes, edge_lengths_dict):
     # Add nodes to each partition
     for i, size in enumerate(partition_sizes):
         nodes_in_partition = list(range(node_id, node_id + size))
-        G.add_nodes_from(nodes_in_partition, type=f'p{i}')
+        G.add_nodes_from(nodes_in_partition, type=f"p{i}")
         partition_nodes.append(nodes_in_partition)
         node_id += size
 
     # Add edges between partitions with specified lengths
     for (p1_idx, p2_idx), length in edge_lengths_dict.items():
-        if p1_idx < len(partition_sizes) and p2_idx < len(partition_sizes) and p1_idx != p2_idx:
+        if (
+            p1_idx < len(partition_sizes)
+            and p2_idx < len(partition_sizes)
+            and p1_idx != p2_idx
+        ):
             for u in partition_nodes[p1_idx]:
                 for v in partition_nodes[p2_idx]:
-                    G.add_edge(u, v, length=length, weight=1/length)
+                    G.add_edge(u, v, length=length, weight=1 / length)
 
     return G
+
 
 def track_and_analyze_eigenvalue_decomposition(G, apply_correction=True):
     """
@@ -313,7 +324,7 @@ def track_and_analyze_eigenvalue_decomposition(G, apply_correction=True):
     """
     # 1. Compute the distance matrix D from the input graph G
     try:
-        D = np.array(nx.floyd_warshall_numpy(G, weight='length'))
+        D = np.array(nx.floyd_warshall_numpy(G, weight="length"))
     except nx.NetworkXNoPath:
          # Handle disconnected graphs if necessary, or let it propagate
          # For consistency, we should return a tuple, even on failure.
@@ -325,7 +336,6 @@ def track_and_analyze_eigenvalue_decomposition(G, apply_correction=True):
             errors_before_correction=None
         ), None
 
-
     # 2. Define the matrix functions A(t) and dA/dt
     def A_func(t):
         return np.exp(-t * D)
@@ -334,7 +344,7 @@ def track_and_analyze_eigenvalue_decomposition(G, apply_correction=True):
         return -D * np.exp(-t * D)
 
     # 3. Define time span and evaluation points
-    t_start, t_end = 4.0, 1.0e-2 # Example time span
+    t_start, t_end = 4.0, 1.0e-2  # Example time span
     t_eval = np.geomspace(t_start, t_end, 10000)
 
     # 4. Call the track_eigen_decomposition function
@@ -367,7 +377,7 @@ def track_and_analyze_eigenvalue_decomposition(G, apply_correction=True):
     for i, t in enumerate(sol.t):
         A_t = A_func(t)
         reconstructed_A = Qs_ode[i] @ Lambdas_ode[i] @ Qs_ode[i].T
-        error = np.linalg.norm(A_t - reconstructed_A, 'fro')
+        error = np.linalg.norm(A_t - reconstructed_A, "fro")
         errors_before_correction.append(error)
 
     # Initialize variables for final results
@@ -386,7 +396,7 @@ def track_and_analyze_eigenvalue_decomposition(G, apply_correction=True):
             for i, t in enumerate(sol.t):
                 A_t = A_func(t)
                 reconstructed_A = corrected_Qs[i] @ corrected_Lambdas[i] @ corrected_Qs[i].T
-                error = np.linalg.norm(A_t - reconstructed_A, 'fro')
+                error = np.linalg.norm(A_t - reconstructed_A, "fro")
                 errors_after_correction.append(error)
 
             # Update final results if correction was successful

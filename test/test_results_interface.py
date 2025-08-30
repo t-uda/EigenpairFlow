@@ -1,7 +1,12 @@
 import numpy as np
 import os
 import tempfile
-from eigenpairflow import track_and_analyze_eigenvalue_decomposition, create_n_partite_graph, EigenTrackingResults
+from eigenpairflow import (
+    track_and_analyze_eigenvalue_decomposition,
+    create_n_partite_graph,
+    EigenTrackingResults,
+)
+
 
 def test_eigen_tracking_results_str_representation():
     """
@@ -16,7 +21,7 @@ def test_eigen_tracking_results_str_representation():
         success=True,
         message="Completed successfully.",
         state=0,
-        errors_before_correction=None
+        errors_before_correction=None,
     )
 
     s = str(results)
@@ -28,9 +33,14 @@ def test_eigen_tracking_results_str_representation():
 
     # Create a dummy failed result object
     failed_results = EigenTrackingResults(
-        t_eval=None, Qs=None, Lambdas=None, errors=None,
-        success=False, message="Graph is disconnected.", state=None,
-        errors_before_correction=None
+        t_eval=None,
+        Qs=None,
+        Lambdas=None,
+        errors=None,
+        success=False,
+        message="Graph is disconnected.",
+        state=None,
+        errors_before_correction=None,
     )
     s_failed = str(failed_results)
     assert "EigenTracking failed: Graph is disconnected." in s_failed

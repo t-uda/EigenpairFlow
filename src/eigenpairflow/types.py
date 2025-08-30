@@ -3,18 +3,19 @@ import joblib
 import numpy as np
 
 _EigenTrackingResults = namedtuple(
-    '_EigenTrackingResults',
+    "_EigenTrackingResults",
     [
-        't_eval',
-        'Qs',
-        'Lambdas',
-        'errors',
-        'success',
-        'message',
-        'state',
-        'errors_before_correction' # This will be None if correction is not applied
-    ]
+        "t_eval",
+        "Qs",
+        "Lambdas",
+        "errors",
+        "success",
+        "message",
+        "state",
+        "errors_before_correction",  # This will be None if correction is not applied
+    ],
 )
+
 
 class EigenTrackingResults(_EigenTrackingResults):
     """
@@ -24,6 +25,7 @@ class EigenTrackingResults(_EigenTrackingResults):
     additional methods for a better user experience, such as a custom
     string representation and serialization methods.
     """
+
     def __str__(self):
         """
         Provides a concise summary of the tracking results.
@@ -41,8 +43,9 @@ class EigenTrackingResults(_EigenTrackingResults):
             if isinstance(value, np.ndarray):
                 summary.append(f"  {field}: np.ndarray with shape {value.shape}")
             elif isinstance(value, list) and value and isinstance(value[0], np.ndarray):
-                summary.append(f"  {field}: list of {len(value)} np.ndarray(s), first shape: {value[0].shape}")
-
+                summary.append(
+                    f"  {field}: list of {len(value)} np.ndarray(s), first shape: {value[0].shape}"
+                )
 
         return "EigenTrackingResults Summary:\n" + "\n".join(summary)
 

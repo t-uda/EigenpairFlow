@@ -3,12 +3,13 @@ import networkx as nx
 import sympy
 from eigenpairflow.main import track_and_analyze_eigenvalue_decomposition
 
+
 def get_analytical_eigenpairs_bipartite(m, n):
     """
     Computes the analytical eigenvalues and eigenvectors for the similarity matrix
     of a complete bipartite graph K_{m,n}.
     """
-    t = sympy.Symbol('t', real=True)
+    t = sympy.Symbol("t", real=True)
     total_nodes = m + n
     A = sympy.zeros(total_nodes, total_nodes)
     x = sympy.exp(-t)
@@ -40,20 +41,25 @@ def get_analytical_eigenpairs_bipartite(m, n):
     eigvals = [p[0] for p in eigen_pairs]
     eigvecs_matrix = sympy.Matrix.hstack(*[p[1] for p in eigen_pairs])
 
-    lambdify_eigvals = sympy.lambdify(t, eigvals, 'numpy')
-    lambdify_eigvecs = sympy.lambdify(t, eigvecs_matrix, 'numpy')
+    lambdify_eigvals = sympy.lambdify(t, eigvals, "numpy")
+    lambdify_eigvecs = sympy.lambdify(t, eigvecs_matrix, "numpy")
 
     return lambdify_eigvals, lambdify_eigvecs
+
 
 def compare_eigenspaces(lambda_num, q_num, lambda_ana, q_ana, tol=1e-6):
     """
     Compares eigenvalues and eigenspaces, handling multiplicities.
     """
     # First, check if the eigenvalues are close
-    np.testing.assert_allclose(np.sort(lambda_num), np.sort(lambda_ana), rtol=tol, atol=tol)
+    np.testing.assert_allclose(
+        np.sort(lambda_num), np.sort(lambda_ana), rtol=tol, atol=tol
+    )
 
     # Group eigenvectors by clustering eigenvalues
-    unique_lambdas, inverse_indices = np.unique(np.round(lambda_ana, int(-np.log10(tol))), return_inverse=True)
+    unique_lambdas, inverse_indices = np.unique(
+        np.round(lambda_ana, int(-np.log10(tol))), return_inverse=True
+    )
 
     for i, unique_val in enumerate(unique_lambdas):
         # Find indices of eigenvectors belonging to this eigenspace
@@ -78,12 +84,14 @@ def run_analytical_test(m, n):
     """Helper function to run the analytical comparison test for K_{m,n}."""
     G = nx.complete_bipartite_graph(m, n)
     for i, j in G.edges():
-        G.edges[i, j]['length'] = 1.0
+        G.edges[i, j]["length"] = 1.0
 
     results_numerical, _ = track_and_analyze_eigenvalue_decomposition(G, apply_correction=False)
     assert results_numerical.success
 
-    analytical_eigvals_func, analytical_eigvecs_func = get_analytical_eigenpairs_bipartite(m, n)
+    analytical_eigvals_func, analytical_eigvecs_func = (
+        get_analytical_eigenpairs_bipartite(m, n)
+    )
 
     for i in range(0, len(results_numerical.t_eval), 2000):
         t = results_numerical.t_eval[i]

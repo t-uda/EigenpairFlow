@@ -3,6 +3,7 @@ import numpy as np
 
 from eigenpairflow.types import EigenTrackingResults
 
+
 def plot_eigenvalue_trajectories(results: EigenTrackingResults, ax=None):
     """
     追跡された各固有値の軌跡を、パラメータ t の関数としてプロットする。
@@ -33,11 +34,11 @@ def plot_eigenvalue_trajectories(results: EigenTrackingResults, ax=None):
     if results.Lambdas is not None and results.t_eval is not None:
         eigenvalues_traces = np.array([np.diag(L) for L in results.Lambdas])
         for i in range(eigenvalues_traces.shape[1]):
-            ax.plot(results.t_eval, eigenvalues_traces[:, i], label=f'λ_{i+1}(t)')
-        ax.set_title('Eigenvalue Trajectories')
-        ax.set_xlabel('Parameter t')
-        ax.set_xscale('log')
-        ax.set_ylabel('Eigenvalues')
+            ax.plot(results.t_eval, eigenvalues_traces[:, i], label=f"λ_{i+1}(t)")
+        ax.set_title("Eigenvalue Trajectories")
+        ax.set_xlabel("Parameter t")
+        ax.set_xscale("log")
+        ax.set_ylabel("Eigenvalues")
         ax.legend()
         ax.grid(True)
 
@@ -45,6 +46,7 @@ def plot_eigenvalue_trajectories(results: EigenTrackingResults, ax=None):
         plt.show()
 
     return ax
+
 
 def plot_reconstruction_error(results: EigenTrackingResults, ax=None):
     """
@@ -77,14 +79,25 @@ def plot_reconstruction_error(results: EigenTrackingResults, ax=None):
         show_plot = False
 
     if results.errors is not None and results.t_eval is not None:
-        ax.semilogy(results.t_eval, results.errors, label='Reconstruction Error', color='crimson')
+        ax.semilogy(
+            results.t_eval,
+            results.errors,
+            label="Reconstruction Error",
+            color="crimson",
+        )
         if results.errors_before_correction is not None:
-             ax.semilogy(results.t_eval, results.errors_before_correction, label='Original ODE Error', linestyle='--', color='darkblue')
+            ax.semilogy(
+                results.t_eval,
+                results.errors_before_correction,
+                label="Original ODE Error",
+                linestyle="--",
+                color="darkblue",
+            )
 
-        ax.set_title('Reconstruction Error')
-        ax.set_xlabel('Parameter t')
-        ax.set_xscale('log')
-        ax.set_ylabel(r'$||A(t) - Q(t)\Lambda(t)Q(t)^T||_F$ (log scale)')
+        ax.set_title("Reconstruction Error")
+        ax.set_xlabel("Parameter t")
+        ax.set_xscale("log")
+        ax.set_ylabel(r"$||A(t) - Q(t)\Lambda(t)Q(t)^T||_F$ (log scale)")
         ax.legend()
         ax.grid(True)
 
@@ -92,6 +105,7 @@ def plot_reconstruction_error(results: EigenTrackingResults, ax=None):
         plt.show()
 
     return ax
+
 
 def plot_magnitudes(results: EigenTrackingResults, ax=None):
     """
@@ -122,14 +136,23 @@ def plot_magnitudes(results: EigenTrackingResults, ax=None):
     else:
         show_plot = False
 
-    if results.magnitudes is not None and results.pseudo_magnitudes is not None and results.t_eval is not None:
-        ax.plot(results.t_eval, results.magnitudes, color='darkred', label='Magnitude')
-        ax.plot(results.t_eval, results.pseudo_magnitudes, color='darkgreen', label='Pseudo-Magnitude')
+    if (
+        results.magnitudes is not None
+        and results.pseudo_magnitudes is not None
+        and results.t_eval is not None
+    ):
+        ax.plot(results.t_eval, results.magnitudes, color="darkred", label="Magnitude")
+        ax.plot(
+            results.t_eval,
+            results.pseudo_magnitudes,
+            color="darkgreen",
+            label="Pseudo-Magnitude",
+        )
 
-        ax.set_title('Magnitude vs Pseudo-Magnitude')
-        ax.set_xlabel('Parameter t')
-        ax.set_xscale('log')
-        ax.set_ylabel('Value')
+        ax.set_title("Magnitude vs Pseudo-Magnitude")
+        ax.set_xlabel("Parameter t")
+        ax.set_xscale("log")
+        ax.set_ylabel("Value")
         # Set a reasonable y-axis limit
         y_min = -1
         if results.pseudo_magnitudes is not None and results.pseudo_magnitudes.size > 0:
@@ -143,6 +166,7 @@ def plot_magnitudes(results: EigenTrackingResults, ax=None):
         plt.show()
 
     return ax
+
 
 def plot_eigen_tracking_results(results: EigenTrackingResults, axes=None):
     """
