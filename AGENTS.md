@@ -62,6 +62,25 @@ When working with notebooks for verification or demonstration, follow these guid
 2.  **Select the Kernel:**
     When creating a new notebook in JupyterLab, be sure to select the `eigenpairflow` kernel. This ensures that your notebook runs in the project's Poetry environment and has access to all required dependencies.
 
+### Using Papermill for Automated Execution
+
+`papermill` is a tool for running notebooks programmatically. It is particularly useful for automation, reproducibility, and parameterizing notebooks.
+
+-   **Parameterization:** To make a notebook parameterizable, create a cell with the tag `parameters`. Variables in this cell can be overridden from the command line.
+-   **Execution:** You can run a notebook and save the output version (with all cell outputs) using the following command structure.
+
+**Example:**
+
+```bash
+poetry run papermill \\
+  notebooks/your_notebook.ipynb \\
+  notebooks/output.ipynb \\
+  -p alpha 0.5 \\
+  -p model_type "fancy_model"
+```
+
+This command executes `your_notebook.ipynb`, sets the `alpha` parameter to `0.5` and `model_type` to `"fancy_model"`, and saves the resulting notebook to `output.ipynb`.
+
 ## Language and Style
 
 *   **Coding Style:** All Python code should adhere to the [PEP 8 style guide](https://peps.python.org/pep-0008/). The `ruff` pre-commit hook helps enforce this.
