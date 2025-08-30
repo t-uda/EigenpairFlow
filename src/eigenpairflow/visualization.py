@@ -5,6 +5,8 @@ from eigenpairflow.types import EigenTrackingResults
 
 def plot_eigenvalue_trajectories(results: EigenTrackingResults, ax=None):
     """
+    固有値の軌跡をプロットします。
+
     Plots the eigenvalue trajectories.
 
     Args:
@@ -39,6 +41,8 @@ def plot_eigenvalue_trajectories(results: EigenTrackingResults, ax=None):
 
 def plot_reconstruction_error(results: EigenTrackingResults, ax=None):
     """
+    再構成誤差をプロットします。
+
     Plots the reconstruction error.
 
     Args:
@@ -74,6 +78,8 @@ def plot_reconstruction_error(results: EigenTrackingResults, ax=None):
 
 def plot_magnitudes(results: EigenTrackingResults, ax=None):
     """
+    マグニチュードと擬似マグニチュードをプロットします。
+
     Plots the magnitude and pseudo-magnitude.
 
     Args:
@@ -114,6 +120,8 @@ def plot_magnitudes(results: EigenTrackingResults, ax=None):
 
 def plot_eigen_tracking_results(results: EigenTrackingResults, axes=None):
     """
+    すべての固有値追跡結果をプロットします。
+
     Plots all eigenpair tracking results on a set of axes.
 
     Args:

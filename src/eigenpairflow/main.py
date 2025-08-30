@@ -7,8 +7,20 @@ from .types import EigenTrackingResults
 
 def solve_symmetric_ode_system_linsolve(Lambda, F):
     """
+    実対称行列の発展方程式 F = dLambda + [H, Lambda] を、
+    H と dLambda の独立成分に関する連立一次方程式として厳密に解く。
+
     Solves the evolution equation for symmetric matrices F = dLambda + [H, Lambda]
     as a system of linear equations for the independent components of H and dLambda.
+
+    Args:
+        Lambda (np.ndarray): n x n の対角固有値行列。
+        F (np.ndarray): n x n の対称行列 (Q^T * dA * Q)。
+
+    Returns:
+        tuple[np.ndarray, np.ndarray]: (H, dLambda_diag) のタプル。
+                                       H は歪対称行列。
+                                       dLambda_diag は固有値の変化率（対角成分のみのベクトル）。
     """
     n = Lambda.shape[0]
     num_h_unknowns = n * (n - 1) // 2
@@ -40,6 +52,9 @@ def solve_symmetric_ode_system_linsolve(Lambda, F):
 
 def symmetric_ode_derivative(t, y, n, dA_func):
     """
+    solve_ivp に渡すための微分方程式の右辺 f(t, y) を定義する。
+    y は [Q.flatten(), diag(Lambda)] を連結したベクトル。
+
     Defines the right-hand side of the ODE for solve_ivp.
     y is a flattened vector of [Q, diag(Lambda)].
     """
@@ -57,6 +72,8 @@ def symmetric_ode_derivative(t, y, n, dA_func):
 
 def track_eigen_decomposition(A_func, dA_func, t_span, t_eval, rtol=1e-5, atol=1e-8):
     """
+    実対称行列関数 A(t) の固有値分解を、常微分方程式を解くことで追跡する。
+
     Tracks the eigenvalue decomposition of a symmetric matrix function A(t) by solving an ODE.
     """
     t0 = t_span[0]
@@ -84,6 +101,8 @@ def track_eigen_decomposition(A_func, dA_func, t_span, t_eval, rtol=1e-5, atol=1
 
 def match_decompositions(predicted_eigvals, predicted_eigvecs, exact_eigvals, exact_eigvecs):
     """
+    正確な対角化分解を、予測された対角化分解にマッチさせる。
+
     Matches an exact eigendecomposition to a predicted one using the Hungarian algorithm.
     """
     cost_matrix = np.abs(predicted_eigvals[:, np.newaxis] - exact_eigvals[np.newaxis, :])
@@ -100,6 +119,8 @@ def match_decompositions(predicted_eigvals, predicted_eigvecs, exact_eigvals, ex
 
 def correct_trajectory(A_func, t_eval, Qs_ode, Lambdas_ode):
     """
+    ODEソルバーで追跡した固有値分解を、各時刻で正確に計算した分解に事後補正する。
+
     Corrects the tracked eigendecomposition using exact calculations at each time step.
     """
     corrected_Qs = []
@@ -122,6 +143,8 @@ def correct_trajectory(A_func, t_eval, Qs_ode, Lambdas_ode):
 
 def create_n_partite_graph(partition_sizes, edge_lengths_dict):
     """
+    n-partiteグラフを生成します。
+
     Creates an n-partite graph.
     """
     G = nx.Graph()
@@ -142,6 +165,8 @@ def create_n_partite_graph(partition_sizes, edge_lengths_dict):
 
 def track_and_analyze_eigenvalue_decomposition(G, t_start=4.0, t_end=1.0e-2, num_t=1000, apply_correction=True):
     """
+    グラフの距離行列に対して固有値追跡と解析を実行します。
+
     Performs eigenvalue tracking and analysis for a graph's distance matrix.
     """
     try:
