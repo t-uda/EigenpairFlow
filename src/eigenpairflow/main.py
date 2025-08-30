@@ -142,7 +142,6 @@ def track_eigen_decomposition(A_func, dA_func, t_span, t_eval, rtol=1e-5, atol=1
         raise RuntimeError(f"Integration failed. {sol.message=}")
 
     # 結果をリストに復元
-    actual_t = sol.t
     Qs = [sol_y[:n*n].reshape((n, n)) for sol_y in sol.y.T]
     Lambdas = [np.diag(sol_y[n*n:]) for sol_y in sol.y.T]
 
@@ -370,8 +369,11 @@ def track_and_analyze_eigenvalue_decomposition(G, apply_correction=True):
 
 
     # 2. Define the matrix functions A(t) and dA/dt
-    A_func = lambda t: np.exp(-t * D)
-    dA_func = lambda t: -D * np.exp(-t * D)
+    def A_func(t):
+        return np.exp(-t * D)
+
+    def dA_func(t):
+        return -D * A_func(t)
 
     # 3. Define time span and evaluation points
     t_start, t_end = 4.0, 1.0e-2 # Example time span
@@ -539,10 +541,10 @@ def plot_eigen_tracking_results(results: EigenTrackingResults, axes=None):
         np.ndarray: A numpy array of the used axes objects.
     """
     if axes is None:
-        fig, axes = plt.subplots(1, 3, figsize=(18, 6))
+        _, axes = plt.subplots(1, 3, figsize=(18, 6))
         show_plot = True
     else:
-        fig = axes[0].get_figure() # Get the figure from the provided axes
+        axes[0].get_figure() # Get the figure from the provided axes
         show_plot = False
 
     # 1. Plot Eigenvalue Trajectories

@@ -1,8 +1,7 @@
-import pytest
 import numpy as np
 import networkx as nx
 import sympy
-from eigenpairflow.main import track_and_analyze_eigenvalue_decomposition, match_decompositions
+from eigenpairflow.main import track_and_analyze_eigenvalue_decomposition
 
 def get_analytical_eigenpairs_bipartite(m, n):
     """
