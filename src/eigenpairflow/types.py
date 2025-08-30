@@ -8,6 +8,8 @@ _EigenTrackingResults = namedtuple(
         't_eval',
         'Qs',
         'Lambdas',
+        'magnitudes',
+        'pseudo_magnitudes',
         'errors',
         'zero_indices',
         'success',
