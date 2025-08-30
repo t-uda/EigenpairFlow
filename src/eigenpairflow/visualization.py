@@ -132,7 +132,7 @@ def plot_magnitudes(results: EigenTrackingResults, ax=None):
         ax.set_ylabel('Value')
         # Set a reasonable y-axis limit
         y_min = -1
-        if results.pseudo_magnitudes:
+        if results.pseudo_magnitudes is not None and results.pseudo_magnitudes.size > 0:
             y_max = np.amax(results.pseudo_magnitudes) + 2
             ax.set_ylim(y_min, y_max)
 
