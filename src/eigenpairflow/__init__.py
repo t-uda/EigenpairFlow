@@ -1,23 +1,31 @@
 from .main import (
-    solve_symmetric_ode_system_linsolve,
-    symmetric_ode_derivative,
-    track_eigen_decomposition,
-    match_decompositions,
-    correct_trajectory,
-    create_n_partite_graph,
-    EigenTrackingResults,
     track_and_analyze_eigenvalue_decomposition,
-    plot_eigen_tracking_results,
+    create_n_partite_graph,
+    track_eigen_decomposition,
+    correct_trajectory,
+    match_decompositions,
+    symmetric_ode_derivative,
+    solve_symmetric_ode_system_linsolve,
 )
+from .visualization import (
+    plot_eigen_tracking_results,
+    plot_eigenvalue_trajectories,
+    plot_reconstruction_error,
+    plot_magnitudes,
+)
+from .types import EigenTrackingResults
 
 __all__ = [
-    "solve_symmetric_ode_system_linsolve",
-    "symmetric_ode_derivative",
-    "track_eigen_decomposition",
-    "match_decompositions",
-    "correct_trajectory",
-    "create_n_partite_graph",
-    "EigenTrackingResults",
     "track_and_analyze_eigenvalue_decomposition",
+    "create_n_partite_graph",
     "plot_eigen_tracking_results",
+    "plot_eigenvalue_trajectories",
+    "plot_reconstruction_error",
+    "plot_magnitudes",
+    "EigenTrackingResults",
+    "track_eigen_decomposition",
+    "correct_trajectory",
+    "match_decompositions",
+    "symmetric_ode_derivative",
+    "solve_symmetric_ode_system_linsolve",
 ]

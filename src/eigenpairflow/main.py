@@ -2,10 +2,9 @@ import numpy as np
 import scipy.linalg
 import scipy.integrate
 import networkx as nx
-from collections import namedtuple
-import joblib
 from scipy.optimize import linear_sum_assignment
-import matplotlib.pyplot as plt
+
+from .types import EigenTrackingResults
 
 def solve_symmetric_ode_system_linsolve(Lambda, F):
     """
@@ -136,7 +135,7 @@ def track_eigen_decomposition(A_func, dA_func, t_span, t_eval, rtol=1e-5, atol=1
         args=(n, dA_func),
         rtol=rtol,
         atol=atol,
-        dense_output=True
+        dense_output=True,
     )
     if not sol.success:
         raise RuntimeError(f"Integration failed. {sol.message=}")
@@ -273,87 +272,45 @@ def create_n_partite_graph(partition_sizes, edge_lengths_dict):
 
     return G
 
-_EigenTrackingResults = namedtuple(
-    '_EigenTrackingResults',
-    [
-        't_eval',
-        'Qs',
-        'Lambdas',
-        'magnitudes',
-        'pseudo_magnitudes',
-        'errors',
-        'zero_indices',
-        'success',
-        'message',
-        'state',
-        'errors_before_correction' # This will be None if correction is not applied
-    ]
-)
-
-class EigenTrackingResults(_EigenTrackingResults):
-    """
-    Results of eigenpair tracking.
-
-    This class extends the namedtuple _EigenTrackingResults to provide
-    additional methods for a better user experience, such as a custom
-    string representation and serialization methods.
-    """
-    def __str__(self):
-        """
-        Provides a concise summary of the tracking results.
-        """
-        if not self.success:
-            return f"EigenTracking failed: {self.message}"
-
-        summary = []
-        summary.append(f"success: {self.success}")
-        summary.append(f"message: {self.message}")
-
-        # Add shape information for numpy arrays
-        for field in self._fields:
-            value = getattr(self, field)
-            if isinstance(value, np.ndarray):
-                summary.append(f"  {field}: np.ndarray with shape {value.shape}")
-            elif isinstance(value, list) and value and isinstance(value[0], np.ndarray):
-                summary.append(f"  {field}: list of {len(value)} np.ndarray(s), first shape: {value[0].shape}")
-
-
-        return "EigenTrackingResults Summary:\n" + "\n".join(summary)
-
-    def save(self, filepath):
-        """
-        Saves the EigenTrackingResults object to a file using joblib.
-
-        Args:
-            filepath (str): The path to the file where the object will be saved.
-        """
-        joblib.dump(self, filepath)
-
-    @classmethod
-    def load(cls, filepath):
-        """
-        Loads an EigenTrackingResults object from a file.
-
-        Args:
-            filepath (str): The path to the file from which to load the object.
-
-        Returns:
-            EigenTrackingResults: The loaded object.
-        """
-        return joblib.load(filepath)
-
 def track_and_analyze_eigenvalue_decomposition(G, apply_correction=True):
     """
-    Performs eigenvalue tracking and analysis for a graph's distance matrix
-    exponentiated, returning results in a namedtuple.
+    グラフの距離行列から構成される行列 A(t) = exp(-tD) の固有値分解を追跡・分析する。
+
+    この関数は、一連の処理をまとめて実行する。
+    1. グラフ G からフロイド・ワーシャル法で距離行列 D を計算する。
+    2. パラメータ t に依存する行列 A(t) = exp(-tD) とその微分 dA/dt を定義する。
+    3. 常微分方程式を解くことで、A(t) の固有値と固有ベクトルの軌跡を追跡する (`track_eigen_decomposition`)。
+    4. (オプション) 各時刻で A(t) を厳密に対角化し、その結果を使ってODEソルバーからの軌跡を補正する (`correct_trajectory`)。
+       これにより、数値誤差の累積を防ぎ、精度を向上させる。
+    5. 追跡された固有対を用いて、関連する物理量（マグニチュード、擬マグニチュード）および再構成誤差を計算する。
+    6. 全ての結果を `EigenTrackingResults` オブジェクトにまとめて返す。
 
     Args:
-        G (nx.Graph): The input NetworkX graph.
-        apply_correction (bool): Whether to apply post-hoc correction using
-                                 exact diagonalization at each time step.
+        G (nx.Graph): 解析対象の重み付きグラフ。辺には 'length' 属性が必要。
+        apply_correction (bool): 軌跡の事後補正を適用するかどうか。デフォルトは True。
 
     Returns:
-        EigenTrackingResults: A namedtuple containing the results.
+        EigenTrackingResults: 追跡と分析の結果を格納した名前付きタプル。
+                          成功したかどうか、メッセージ、各時刻の固有対、計算された物理量などが含まれる。
+
+    --- English ---
+    Tracks and analyzes the eigenvalue decomposition of the matrix A(t) = exp(-tD) derived from a graph's distance matrix.
+
+    This function performs a complete workflow:
+    1. Computes the distance matrix D from graph G using the Floyd-Warshall algorithm.
+    2. Defines the parameter-dependent matrix A(t) = exp(-tD) and its derivative dA/dt.
+    3. Tracks the eigenvalue and eigenvector trajectories of A(t) by solving an ordinary differential equation (`track_eigen_decomposition`).
+    4. (Optional) Applies a post-hoc correction to the trajectory from the ODE solver by using exact diagonalization of A(t) at each time step (`correct_trajectory`). This mitigates the accumulation of numerical errors and improves accuracy.
+    5. Computes relevant physical quantities (magnitude, pseudo-magnitude) and reconstruction error using the tracked eigenpairs.
+    6. Returns all results consolidated into an `EigenTrackingResults` object.
+
+    Args:
+        G (nx.Graph): The weighted input graph. Edges must have a 'length' attribute.
+        apply_correction (bool): Whether to apply the post-hoc trajectory correction. Defaults to True.
+
+    Returns:
+        EigenTrackingResults: A named tuple containing the results of the tracking and analysis,
+                          including success status, messages, eigenpairs at each time step, and computed quantities.
     """
     # 1. Compute the distance matrix D from the input graph G
     try:
@@ -373,7 +330,7 @@ def track_and_analyze_eigenvalue_decomposition(G, apply_correction=True):
         return np.exp(-t * D)
 
     def dA_func(t):
-        return -D * A_func(t)
+        return -D * np.exp(-t * D)
 
     # 3. Define time span and evaluation points
     t_start, t_end = 4.0, 1.0e-2 # Example time span
@@ -526,76 +483,3 @@ def track_and_analyze_eigenvalue_decomposition(G, apply_correction=True):
 
     # 13. Return the namedtuple
     return results
-
-def plot_eigen_tracking_results(results: EigenTrackingResults, axes=None):
-    """
-    Plots the results from the EigenTrackingResults namedtuple.
-
-    Args:
-        results (EigenTrackingResults): The namedtuple containing the tracking results.
-        axes (np.ndarray, optional): A numpy array of matplotlib axes objects
-                                     (e.g., from plt.subplots(1, 3)).
-                                     If None, a new figure and axes are created.
-
-    Returns:
-        np.ndarray: A numpy array of the used axes objects.
-    """
-    if axes is None:
-        _, axes = plt.subplots(1, 3, figsize=(18, 6))
-        show_plot = True
-    else:
-        axes[0].get_figure() # Get the figure from the provided axes
-        show_plot = False
-
-    # 1. Plot Eigenvalue Trajectories
-    ax1 = axes[0]
-    if results.Lambdas is not None and results.t_eval is not None:
-        eigenvalues_traces = np.array([np.diag(L) for L in results.Lambdas])
-        for i in range(eigenvalues_traces.shape[1]):
-            ax1.plot(results.t_eval, eigenvalues_traces[:, i], label=f'λ_{i+1}(t)')
-        ax1.set_title('Eigenvalue Trajectories')
-        ax1.set_xlabel('Parameter t')
-        ax1.set_xscale('log')
-        ax1.set_ylabel('Eigenvalues')
-        ax1.legend()
-        ax1.grid(True)
-
-    # 2. Plot Reconstruction Error
-    ax2 = axes[1]
-    if results.errors is not None and results.t_eval is not None:
-        ax2.semilogy(results.t_eval, results.errors, label='Reconstruction Error', color='crimson')
-        if results.errors_before_correction is not None:
-             ax2.semilogy(results.t_eval, results.errors_before_correction, label='Original ODE Error', linestyle='--', color='darkblue')
-
-        ax2.set_title('Reconstruction Error')
-        ax2.set_xlabel('Parameter t')
-        ax2.set_xscale('log')
-        ax2.set_ylabel(r'$||A(t) - Q(t)\Lambda(t)Q(t)^T||_F$ (log scale)')
-        ax2.legend()
-        ax2.grid(True)
-
-
-    # 3. Plot Magnitude vs Pseudo-Magnitude
-    ax3 = axes[2]
-    if results.magnitudes is not None and results.pseudo_magnitudes is not None and results.t_eval is not None:
-        ax3.plot(results.t_eval, results.magnitudes, color='darkred', label='Magnitude')
-        ax3.plot(results.t_eval, results.pseudo_magnitudes, color='darkgreen', label='Pseudo-Magnitude')
-
-        ax3.set_title('Magnitude vs Pseudo-Magnitude')
-        ax3.set_xlabel('Parameter t')
-        ax3.set_xscale('log')
-        ax3.set_ylabel('Value')
-        # Set a reasonable y-axis limit
-        y_min = -1
-        y_max = np.amax(results.pseudo_magnitudes) + 2
-        ax3.set_ylim(y_min, y_max)
-
-        ax3.legend()
-        ax3.grid(True)
-
-    plt.tight_layout()
-
-    if show_plot:
-        plt.show()
-
-    return axes
