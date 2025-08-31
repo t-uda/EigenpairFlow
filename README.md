@@ -1,8 +1,14 @@
 # EigenpairFlow
+<img src="https://github.com/t-uda/eigenpairflow/raw/main/eigenpairflow-logo.png" alt="eigenpairflow-logo" width="256" />
 
 [![CI](https://github.com/t-uda/EigenpairFlow/actions/workflows/ci.yml/badge.svg)](https://github.com/t-uda/EigenpairFlow/actions/workflows/ci.yml)
 
 Continuous and stable tracking of eigendecomposition for parameter-dependent matrices.
+
+See the demonstration notebook here!
+
+* [`toy_model_demonstration.ipynb`](notebooks/toy_model_demonstration.ipynb)
+* [`magnitude_demonstration.ipynb`](notebooks/magnitude_demonstration.ipynb)
 
 ## Supported Versions
 
