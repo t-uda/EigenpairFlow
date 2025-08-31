@@ -18,7 +18,6 @@ def test_eigen_tracking_results_str_representation():
         norm_errors=np.array([0.0, 0.0]),
         success=True,
         message="Completed successfully.",
-        state=0,
     )
 
     s = str(results)
@@ -33,7 +32,6 @@ def test_eigen_tracking_results_str_representation():
         norm_errors=None,
         success=False,
         message="Graph is disconnected.",
-        state=None,
     )
     s_failed = str(failed_results)
     assert "EigenTracking failed: Graph is disconnected." in s_failed

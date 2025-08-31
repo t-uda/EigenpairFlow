@@ -11,7 +11,6 @@ _EigenTrackingResults = namedtuple(
         "norm_errors",
         "success",
         "message",
-        "state",
     ],
 )
 

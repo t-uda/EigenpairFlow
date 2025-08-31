@@ -86,11 +86,9 @@ def eigenpairtrack(
         )
         success = sol.success
         message = sol.message
-        state = sol.status
     except RuntimeError as e:
         success = False
         message = f"Tracking failed: {e}"
-        state = -1
         sol = None
 
     if not success:
@@ -101,7 +99,6 @@ def eigenpairtrack(
             norm_errors=None,
             success=success,
             message=message,
-            state=state,
         )
 
     # --- Post-processing (correction and error calculation) ---
@@ -126,5 +123,4 @@ def eigenpairtrack(
         norm_errors=norm_errors,
         success=success,
         message=message,
-        state=state,
     )
