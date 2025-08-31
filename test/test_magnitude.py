@@ -1,6 +1,7 @@
 import numpy as np
 from eigenpairflow.magnitude import calculate_magnitudes
 
+
 def test_calculate_magnitudes():
     """
     Tests the calculate_magnitudes function.
@@ -8,13 +9,15 @@ def test_calculate_magnitudes():
     # Test case 1: Simple, non-zero eigenvalues
     Qs_1 = [np.eye(2)]
     Lambdas_1 = [np.diag([2.0, 4.0])]
-    D_1 = np.zeros((2, 2)) # D is needed to get the shape for np.ones
+    D_1 = np.zeros((2, 2))  # D is needed to get the shape for np.ones
     magnitudes_1 = calculate_magnitudes(Qs_1, Lambdas_1, D_1)
     # Expected: (1/2 + 1/4) = 0.75
     np.testing.assert_allclose(magnitudes_1, [0.75])
 
     # Test case 2: Eigenvectors are not identity
-    Qs_2 = [np.array([[1/np.sqrt(2), -1/np.sqrt(2)], [1/np.sqrt(2), 1/np.sqrt(2)]])]
+    Qs_2 = [
+        np.array([[1 / np.sqrt(2), -1 / np.sqrt(2)], [1 / np.sqrt(2), 1 / np.sqrt(2)]])
+    ]
     Lambdas_2 = [np.diag([1.0, 2.0])]
     D_2 = np.zeros((2, 2))
     # v = Q.T @ [1, 1] = [sqrt(2), 0]

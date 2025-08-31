@@ -1,11 +1,9 @@
 import numpy as np
 import os
 import tempfile
-from eigenpairflow import (
-    track_and_analyze_eigenvalue_decomposition,
-    create_n_partite_graph,
-    EigenTrackingResults,
-)
+import networkx as nx
+from eigenpairflow import eigenpairtrack, EigenTrackingResults
+from eigenpairflow.graph import create_n_partite_graph
 
 
 def test_eigen_tracking_results_str_representation():
@@ -50,19 +48,34 @@ def test_eigen_tracking_results_serialization():
     """
     Tests the save and load methods of the EigenTrackingResults class.
     """
-    # Define partition sizes and edge lengths for a sample graph
+    # 1. Create a sample graph and define the matrix function
     partitions = [2, 2]
     lengths = {(0, 1): 1.0}
-
-    # Create the n-partite graph
     G = create_n_partite_graph(partitions, lengths)
+    D = np.array(nx.floyd_warshall_numpy(G, weight="length"))
 
-    # Run the analysis function
-    results, _ = track_and_analyze_eigenvalue_decomposition(G, apply_correction=False)
+    def A_func(t):
+        return np.exp(-t * D)
+
+    def dA_func(t):
+        return -D * np.exp(-t * D)
+
+    # 2. Run the tracking
+    t_start, t_end = 1.0, 0.1
+    t_eval = np.linspace(t_start, t_end, 10)
+    results = eigenpairtrack(
+        A_func,
+        dA_func,
+        (t_start, t_end),
+        t_eval,
+        matrix_type="symmetric",
+        method="eigh",
+        apply_correction=False,
+    )
 
     assert results.success
 
-    # Use a temporary file for saving and loading
+    # 3. Use a temporary file for saving and loading
     with tempfile.TemporaryDirectory() as tmpdir:
         filepath = os.path.join(tmpdir, "results.joblib")
         results.save(filepath)

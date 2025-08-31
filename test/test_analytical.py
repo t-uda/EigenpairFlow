@@ -1,7 +1,7 @@
 import numpy as np
 import networkx as nx
 import sympy
-from eigenpairflow.main import track_and_analyze_eigenvalue_decomposition
+from eigenpairflow import eigenpairtrack
 
 
 def get_analytical_eigenpairs_bipartite(m, n):
@@ -86,7 +86,26 @@ def run_analytical_test(m, n):
     for i, j in G.edges():
         G.edges[i, j]["length"] = 1.0
 
-    results_numerical, _ = track_and_analyze_eigenvalue_decomposition(G, apply_correction=False)
+    D = np.array(nx.floyd_warshall_numpy(G, weight="length"))
+
+    def A_func(t):
+        return np.exp(-t * D)
+
+    def dA_func(t):
+        return -D * np.exp(-t * D)
+
+    t_start, t_end = 4.0, 1.0e-2
+    t_eval = np.geomspace(t_start, t_end, 10000)
+
+    results_numerical = eigenpairtrack(
+        A_func,
+        dA_func,
+        (t_start, t_end),
+        t_eval,
+        matrix_type="symmetric",
+        method="eigh",
+        apply_correction=False,
+    )
     assert results_numerical.success
 
     analytical_eigvals_func, analytical_eigvecs_func = (
