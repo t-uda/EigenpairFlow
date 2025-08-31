@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "eigenpairflow"
-version = "0.1.0"
+version = "0.2.0"
 description = "Continuous and stable tracking of eigendecomposition for parameter-dependent matrices"
 authors = ["Tomoki Uda <tomoki.uda@gmail.com>"]
 
