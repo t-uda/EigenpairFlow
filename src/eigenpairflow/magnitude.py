@@ -1,4 +1,9 @@
 import numpy as np
+import matplotlib.pyplot as plt
+
+# Since this module is for post-processing, it's okay to have a soft dependency on types.
+# A better way might be to use a more generic data structure if this becomes a problem.
+
 
 def get_zero_indices(Lambdas):
     """
@@ -36,7 +41,7 @@ def calculate_magnitudes(Qs, Lambdas, D):
         Q_t = Qs[i]
         Lambda_t = Lambdas[i]
 
-        with np.errstate(divide='ignore'):
+        with np.errstate(divide="ignore"):
             inv_diag_lambda = 1.0 / np.diag(Lambda_t)
 
         Lambda_inverse = np.diag(inv_diag_lambda)
@@ -65,7 +70,7 @@ def calculate_pseudo_magnitudes(Qs, Lambdas, D, zero_indices):
         Q_t = Qs[i]
         Lambda_t = Lambdas[i]
 
-        with np.errstate(divide='ignore'):
+        with np.errstate(divide="ignore"):
             inv_diag_lambda = 1.0 / np.diag(Lambda_t)
 
         pseudo_Lambda_inverse_diag = inv_diag_lambda
@@ -78,3 +83,40 @@ def calculate_pseudo_magnitudes(Qs, Lambdas, D, zero_indices):
         pseudo_mag = v.T @ pseudo_Lambda_inverse @ v
         pseudo_magnitudes.append(pseudo_mag)
     return np.array(pseudo_magnitudes)
+
+
+def plot_magnitudes(t_eval, magnitudes, pseudo_magnitudes, ax=None):
+    """
+    マグニチュードと擬似マグニチュードの軌跡をプロットする。
+    """
+    if ax is None:
+        fig, ax = plt.subplots(1, 1, figsize=(8, 6))
+        show_plot = True
+    else:
+        show_plot = False
+
+    ax.plot(t_eval, magnitudes, color="darkred", label="Magnitude")
+    ax.plot(
+        t_eval,
+        pseudo_magnitudes,
+        color="darkgreen",
+        label="Pseudo-Magnitude",
+    )
+
+    ax.set_title("Magnitude vs Pseudo-Magnitude")
+    ax.set_xlabel("Parameter t")
+    ax.set_xscale("log")
+    ax.set_ylabel("Value")
+
+    y_min = -1
+    if pseudo_magnitudes is not None and pseudo_magnitudes.size > 0:
+        y_max = np.amax(pseudo_magnitudes) + 2
+        ax.set_ylim(y_min, y_max)
+
+    ax.legend()
+    ax.grid(True)
+
+    if show_plot:
+        plt.show()
+
+    return ax

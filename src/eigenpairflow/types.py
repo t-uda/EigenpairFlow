@@ -8,11 +8,9 @@ _EigenTrackingResults = namedtuple(
         "t_eval",
         "Qs",
         "Lambdas",
-        "errors",
+        "norm_errors",
         "success",
         "message",
-        "state",
-        "errors_before_correction",  # This will be None if correction is not applied
     ],
 )
 
