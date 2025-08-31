@@ -23,44 +23,39 @@ First, define the matrix-valued function `A(t)` and its derivative `dA(t)/dt`.
 import numpy as np
 from eigenpairflow import eigenpairtrack
 
-# Define a matrix function A(t) = R(t) D(t) R(t).T
-def A_func(t: float) -> np.ndarray:
-    theta = np.pi / 4 * t
-    c, s = np.cos(theta), np.sin(theta)
-    R = np.array([[c, -s], [s, c]])
-    D = np.diag([1, 1 + t])
-    return R @ D @ R.T
+# Define a matrix function A(t)
+def A_func(t):
+  return np.array([[3 + np.cos(t), np.sin(t)], [np.sin(t), 3 - np.cos(t)]])
 
-# Define its derivative dA(t)/dt
-def dA_func(t: float) -> np.ndarray:
-    theta = np.pi / 4 * t
-    dtheta = np.pi / 4
-    c, s = np.cos(theta), np.sin(theta)
-    R = np.array([[c, -s], [s, c]])
-    D = np.diag([1, 1 + t])
-    dR = dtheta * np.array([[-s, -c], [c, -s]])
-    dD = np.diag([0, 1])
-    return dR @ D @ R.T + R @ dD @ R.T + R @ D @ dR.T
+def dA_func(t):
+  return np.array([[-np.sin(t), np.cos(t)], [np.cos(t), np.sin(t)]])
 ```
 
 Then, call `eigenpairtrack` to solve the tracking problem over a given time interval.
 
 ```python
 # Set the time interval and evaluation points
-t_start, t_end = 0.0, 4.0
-t_eval = np.linspace(t_start, t_end, 200)
+t_start, t_end = 0.0, 3.0
+t_eval = np.linspace(t_start, t_end, 10)
 
 # Track the eigenpairs
-results = eigenpairtrack(A_func, dA_func, (t_start, t_end), t_eval)
+result = eigenpairtrack(A_func, dA_func, (t_start, t_end), t_eval)
 
-# The results object contains the tracked eigenvalues (results.ls)
-# and eigenvectors (results.Qs) at each time point in t_eval.
-print("Tracking successful:", results.success)
-print("Eigenvalues at t=0:", results.ls[0])
-print("Eigenvectors at t=0:\\n", results.Qs[0])
+# The results object contains the tracked eigenvalues (result.Lambdas)
+# and eigenvectors (result.Qs) at each time point in t_eval.
+print(result)
 ```
 
-For more detailed examples, please see the [demonstration notebooks](notebooks/).
+```
+EigenTrackingResults Summary:
+success: True
+message: The solver successfully reached the end of the integration interval.
+  t_eval: np.ndarray with shape (10,)
+  Qs: list of 10 np.ndarray(s), first shape: (2, 2)
+  Lambdas: list of 10 np.ndarray(s), first shape: (2, 2)
+```
+
+For more detailed examples, please see the [demonstration notebooks](https://github.com/t-uda/EigenpairFlow/blob/main/notebooks/toy_model_demonstration.ipynb).
 
 ## Supported Versions
 
