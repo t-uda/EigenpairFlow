@@ -6,14 +6,17 @@ This repository uses `pre-commit` to automatically run code formatters and linte
 
 ### 1. One-Time Setup
 
-Before you start working, you need to install the dependencies and the pre-commit hooks. Run these commands from the root of the repository:
+Before you start working, set up your environment by running the following commands from the repository root. This ensures that dependencies are installed and `pre-commit` hooks are correctly configured for automated code quality checks.
 
 ```bash
-# Install project dependencies, including development tools
+# 1. Install project dependencies
 poetry install
 
-# Install the pre-commit hooks
-pre-commit install
+# 2. Prevent a common git hook error before installation
+git config --global --unset core.hooksPath
+
+# 3. Install the pre-commit hooks into your local .git/hooks/ directory
+poetry run pre-commit install
 ```
 
 ### Important Notes for Agents
@@ -48,6 +51,7 @@ This ensures that the project's dependencies remain consistent and reproducible.
     *   **Formatting Failures (`ruff-format`):** The formatter will automatically change your files. These changes are not yet staged. You need to stage them with `git add <changed_files>` and then run `git commit` again.
     *   **Linting Failures (`ruff`):** The linter will report issues in your code. Read the error messages and fix the code accordingly. After fixing, stage your changes and commit again.
     *   **Test Failures (`pytest`):** The test suite will run automatically. If any tests fail, the commit will be blocked. Read the `pytest` output to understand which tests failed, debug the code, and fix the issues until all tests pass. Then, commit again.
+    *   **Special Case: Hook Deadlocks:** In some situations, a hook might fail not because of a code issue, but because of an environment problem (e.g., `poetry` not being found in the `PATH`). This can block all file modifications. If you suspect this is happening, you can temporarily skip a specific hook by setting the `SKIP` environment variable before invoking a tool. For the `pytest` hook, you would set it like this: `SKIP=pytest`. This should be used as a last resort to resolve a stuck state.
 
 4.  **Verify Changes**:
     Before finalizing your work, review your changes to ensure they are within the scope of the assigned task and do not include any unintended modifications. A good way to do this is to review the output of `git diff`.
