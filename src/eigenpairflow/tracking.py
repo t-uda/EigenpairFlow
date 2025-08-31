@@ -81,7 +81,7 @@ def eigenpairtrack(
 
     # --- Dispatch to the appropriate low-level tracker ---
     try:
-        Qs_ode, Lambdas_ode, sol = _track_symmetric_eigh(
+        Qs, Lambdas, sol = _track_symmetric_eigh(
             A_func, dA_func, t_span, t_eval, rtol=rtol, atol=atol
         )
         success = sol.success
@@ -98,53 +98,33 @@ def eigenpairtrack(
             t_eval=t_eval,
             Qs=None,
             Lambdas=None,
-            errors=None,
+            norm_errors=None,
             success=success,
             message=message,
             state=state,
-            errors_before_correction=None,
         )
 
-    # --- Post-processing (error calculation and correction) ---
-    errors_before_correction = []
-    for i, t in enumerate(sol.t):
-        A_t = A_func(t)
-        reconstructed_A = Qs_ode[i] @ Lambdas_ode[i] @ Qs_ode[i].T
-        error = np.linalg.norm(A_t - reconstructed_A, "fro")
-        errors_before_correction.append(error)
-
-    final_Qs, final_Lambdas = Qs_ode, Lambdas_ode
-    final_errors = errors_before_correction
-    final_errors_before_correction = None
-
+    # --- Post-processing (correction and error calculation) ---
     if apply_correction:
         try:
-            corrected_Qs, corrected_Lambdas = correct_trajectory(
-                A_func, sol.t, Qs_ode, Lambdas_ode
-            )
-            errors_after_correction = []
-            for i, t in enumerate(sol.t):
-                A_t = A_func(t)
-                reconstructed_A = (
-                    corrected_Qs[i] @ corrected_Lambdas[i] @ corrected_Qs[i].T
-                )
-                error = np.linalg.norm(A_t - reconstructed_A, "fro")
-                errors_after_correction.append(error)
-
-            final_Qs = corrected_Qs
-            final_Lambdas = corrected_Lambdas
-            final_errors = errors_after_correction
-            final_errors_before_correction = errors_before_correction
+            Qs, Lambdas = correct_trajectory(A_func, sol.t, Qs, Lambdas)
         except Exception as e:
             message += f" | Correction failed: {e}"
 
+    # Calculate the final norm errors
+    norm_errors = []
+    for i, t in enumerate(sol.t):
+        A_t = A_func(t)
+        reconstructed_A = Qs[i] @ Lambdas[i] @ Qs[i].T
+        error = np.linalg.norm(A_t - reconstructed_A, "fro")
+        norm_errors.append(error)
+
     return EigenTrackingResults(
         t_eval=sol.t,
-        Qs=final_Qs,
-        Lambdas=final_Lambdas,
-        errors=final_errors,
+        Qs=Qs,
+        Lambdas=Lambdas,
+        norm_errors=norm_errors,
         success=success,
         message=message,
         state=state,
-        errors_before_correction=final_errors_before_correction,
     )

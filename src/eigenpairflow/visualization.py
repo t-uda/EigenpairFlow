@@ -7,9 +7,6 @@ from .types import EigenTrackingResults
 def plot_eigenvalue_trajectories(results: EigenTrackingResults, ax=None):
     """
     追跡された各固有値の軌跡を、パラメータ t の関数としてプロットする。
-
-    横軸にパラメータ t（対数スケール）、縦軸に固有値 λ_i(t) をとり、
-    各固有値が t の変化に伴いどのように変動するかを視覚化する。
     """
     if ax is None:
         fig, ax = plt.subplots(1, 1, figsize=(8, 6))
@@ -37,10 +34,6 @@ def plot_eigenvalue_trajectories(results: EigenTrackingResults, ax=None):
 def plot_reconstruction_error(results: EigenTrackingResults, ax=None):
     """
     再構成誤差 ||A(t) - Q(t)Λ(t)Q(t)^T||_F の時間発展をプロットする。
-
-    横軸にパラメータ t（対数スケール）、縦軸にフロベニウスノルムで計算した
-    再構成誤差（対数スケール）をとり、追跡された固有値分解の精度を評価する。
-    補正が適用された場合、補正前後の誤差を比較して表示する。
     """
     if ax is None:
         fig, ax = plt.subplots(1, 1, figsize=(8, 6))
@@ -48,22 +41,13 @@ def plot_reconstruction_error(results: EigenTrackingResults, ax=None):
     else:
         show_plot = False
 
-    if results.errors is not None and results.t_eval is not None:
+    if results.norm_errors is not None and results.t_eval is not None:
         ax.semilogy(
             results.t_eval,
-            results.errors,
-            label="Reconstruction Error",
+            results.norm_errors,
+            label="Reconstruction Norm Error",
             color="crimson",
         )
-        if results.errors_before_correction is not None:
-            ax.semilogy(
-                results.t_eval,
-                results.errors_before_correction,
-                label="Original ODE Error",
-                linestyle="--",
-                color="darkblue",
-            )
-
         ax.set_title("Reconstruction Error")
         ax.set_xlabel("Parameter t")
         ax.set_xscale("log")

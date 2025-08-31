@@ -40,4 +40,4 @@ def test_track_runs_with_graph_example():
     assert results.t_eval is not None
     assert results.Qs is not None
     assert results.Lambdas is not None
-    assert results.errors is not None
+    assert results.norm_errors is not None
