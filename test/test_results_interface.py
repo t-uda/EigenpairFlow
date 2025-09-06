@@ -63,7 +63,7 @@ def test_eigen_tracking_results_serialization():
         t_eval,
         matrix_type="symmetric",
         method="eigh",
-        apply_correction=False,
+        correction_method=None,
     )
 
     assert results.success

@@ -56,44 +56,122 @@ def match_decompositions(
     return matched_eigvals, matched_eigvecs
 
 
-def correct_trajectory(A_func, t_eval, Qs_ode, Lambdas_ode):
+def correct_trajectory(A_func, t_eval, Qs_ode, Lambdas_ode, method="matching"):
     """
-    ODEソルバーで追跡した固有値分解を、各時刻で正確に計算した分解に事後補正する。
-    ODE結果をガイドとして、正確な分解を並べ替え・符号合わせする。
+    Corrects the eigenvalue decomposition trajectory from an ODE solver.
+
+    Depending on the specified method, this function either matches the ODE
+    results to a freshly computed decomposition or uses the Ogita-Aishima
+    iterative refinement method.
 
     Args:
-        A_func (callable): 時刻 t を受け取り、真の行列 A(t) を返す関数。
-        t_eval (np.ndarray): 評価時刻の1D配列。
-        Qs_ode (list of np.ndarray): ODEソルバーから得られた固有ベクトル行列のリスト。
-        Lambdas_ode (list of np.ndarray): ODEソルバーから得られた対角固有値行列のリスト。
+        A_func (callable): Function that returns the true matrix A(t).
+        t_eval (np.ndarray): Array of time points for evaluation.
+        Qs_ode (list of np.ndarray): List of eigenvector matrices from the ODE solver.
+        Lambdas_ode (list of np.ndarray): List of diagonal eigenvalue matrices from the ODE solver.
+        method (str): The correction method to use.
+                      'matching': Re-calculates the decomposition and matches it.
+                      'ogita_aishima': Refines the ODE result using the Ogita-Aishima method.
 
     Returns:
         tuple[list[np.ndarray], list[np.ndarray]]:
-            - corrected_Qs: 補正された固有ベクトル行列のリスト。
-            - corrected_Lambdas: 補正された対角固有値行列のリスト。
+            - corrected_Qs: List of corrected eigenvector matrices.
+            - corrected_Lambdas: List of corrected diagonal eigenvalue matrices.
     """
     corrected_Qs = []
     corrected_Lambdas = []
 
     for i, t in enumerate(t_eval):
-        # 1. その時刻における真の行列 A_t を計算
         A_t = A_func(t)
 
-        # 2. A_t の正確な固有値分解を計算
-        exact_eigvals, exact_eigvecs = scipy.linalg.eigh(A_t)
+        if method == "matching":
+            exact_eigvals, exact_eigvecs = scipy.linalg.eigh(A_t)
+            predicted_eigvals = np.diag(Lambdas_ode[i])
+            predicted_eigvecs = Qs_ode[i]
+            matched_eigvals, matched_eigvecs = match_decompositions(
+                predicted_eigvals, predicted_eigvecs, exact_eigvals, exact_eigvecs
+            )
+            corrected_Qs.append(matched_eigvecs)
+            corrected_Lambdas.append(np.diag(matched_eigvals))
 
-        # 3. match_decompositions を用いて、正確な分解をODE結果にマッチさせる
-        # ODE結果を「予測」、正確な計算を「正確」として渡す
-        # Lambdas_ode は対角行列なので、固有値を取り出す
-        predicted_eigvals = np.diag(Lambdas_ode[i])
-        predicted_eigvecs = Qs_ode[i]
+        elif method == "ogita_aishima":
+            X_hat = Qs_ode[i]
+            X_refined, D_refined = ogita_aishima_refinement(A_t, X_hat)
+            corrected_Qs.append(X_refined)
+            corrected_Lambdas.append(D_refined)
 
-        matched_eigvals, matched_eigvecs = match_decompositions(
-            predicted_eigvals, predicted_eigvecs, exact_eigvals, exact_eigvecs
-        )
-
-        # 4. 補正結果をリストに追加
-        corrected_Qs.append(matched_eigvecs)
-        corrected_Lambdas.append(np.diag(matched_eigvals))  # 対角行列に戻す
+        else:
+            raise ValueError(f"Unknown correction method: {method}")
 
     return corrected_Qs, corrected_Lambdas
+
+
+def ogita_aishima_refinement(A, X_hat, max_iter=10, tol=1e-12, rho=1.0):
+    """
+    Refines a given approximate eigenvector matrix using the Ogita-Aishima method.
+    This implementation is vectorized for performance.
+
+    Args:
+        A (np.ndarray): The target real symmetric matrix.
+        X_hat (np.ndarray): The approximate eigenvector matrix.
+        max_iter (int): Maximum number of iterations.
+        tol (float): Tolerance for convergence.
+        rho (float): Parameter to determine if eigenvalues are clustered.
+
+    Returns:
+        tuple[np.ndarray, np.ndarray]:
+            - X_new: The refined eigenvector matrix.
+            - D_new: A diagonal matrix containing the refined eigenvalues.
+    """
+    n = A.shape[0]
+    Id = np.eye(n)
+    X_new = X_hat.copy()
+
+    for _ in range(max_iter):
+        # 1. Calculate residual matrices
+        R = Id - X_new.T @ X_new
+        S = X_new.T @ A @ X_new
+
+        # 2. Calculate approximate eigenvalues
+        r_ii = np.diag(R)
+        s_ii = np.diag(S)
+        lambda_tilde = s_ii / (1 - r_ii + 1e-15)
+
+        # 3. Calculate the correction matrix E_tilde (vectorized)
+        s_off_diag = S - np.diag(s_ii)
+        delta = rho * np.max(np.abs(s_off_diag))
+
+        # Differences between all pairs of eigenvalues
+        lambda_diffs = lambda_tilde[np.newaxis, :] - lambda_tilde[:, np.newaxis]
+
+        # Mask for distinct eigenvalues (avoiding the diagonal)
+        distinct_mask = np.abs(lambda_diffs) > delta
+        np.fill_diagonal(distinct_mask, False)
+
+        # Numerator for the distinct case update: s_ij + lambda_j * r_ij
+        numerator = S + R * lambda_tilde[np.newaxis, :]
+
+        # Denominator, with a safe value where the mask is false to avoid division by zero
+        denominator = np.where(distinct_mask, lambda_diffs, 1.0)
+
+        # Calculate E_tilde using np.where for conditional logic
+        E_tilde = np.where(distinct_mask, numerator / denominator, R / 2.0)
+
+        # Set diagonal elements
+        np.fill_diagonal(E_tilde, r_ii / 2.0)
+
+        # 4. Update the solution
+        X_new = X_new @ (Id + E_tilde)
+
+        # 5. Check for convergence
+        if np.linalg.norm(E_tilde) < tol:
+            break
+
+    # Final calculation of eigenvalues and sorting
+    S_final = X_new.T @ A @ X_new
+    final_eigvals = np.diag(S_final)
+    sort_indices = np.argsort(final_eigvals)
+    D_new = np.diag(final_eigvals[sort_indices])
+    X_new = X_new[:, sort_indices]
+
+    return X_new, D_new

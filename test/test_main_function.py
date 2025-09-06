@@ -32,7 +32,7 @@ def test_track_runs_with_graph_example():
         t_eval,
         matrix_type="symmetric",
         method="eigh",
-        apply_correction=True,
+        correction_method="matching",
     )
 
     # 4. Assert that the function ran successfully
