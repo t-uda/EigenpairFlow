@@ -50,7 +50,7 @@ def eigenpairtrack(
     t_eval,
     matrix_type="symmetric",
     method="eigh",
-    apply_correction=True,
+    correction_method="matching",
     rtol=1e-13,
     atol=1e-12,
 ):
@@ -67,7 +67,10 @@ def eigenpairtrack(
         t_eval (np.ndarray): Array of time points to evaluate the results.
         matrix_type (str): The type of the matrix. Currently only "symmetric" is supported.
         method (str): The decomposition method. Currently only "eigh" is supported.
-        apply_correction (bool): Whether to apply post-hoc trajectory correction. Defaults to True.
+        correction_method (str or None): The correction method to apply.
+                                     'matching': Re-calculates and matches.
+                                     'ogita_aishima': Uses iterative refinement.
+                                     None: No correction is applied.
         rtol (float): Relative tolerance for the ODE solver.
         atol (float): Absolute tolerance for the ODE solver.
 
@@ -102,11 +105,13 @@ def eigenpairtrack(
         )
 
     # --- Post-processing (correction and error calculation) ---
-    if apply_correction:
+    if correction_method:
         try:
-            Qs, Lambdas = correct_trajectory(A_func, sol.t, Qs, Lambdas)
+            Qs, Lambdas = correct_trajectory(
+                A_func, sol.t, Qs, Lambdas, method=correction_method
+            )
         except Exception as e:
-            message += f" | Correction failed: {e}"
+            message += f" | Correction failed with method '{correction_method}': {e}"
 
     # Calculate the final norm errors
     norm_errors = []

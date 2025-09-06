@@ -104,7 +104,7 @@ def run_analytical_test(m, n):
         t_eval,
         matrix_type="symmetric",
         method="eigh",
-        apply_correction=False,
+        correction_method=None,
     )
     assert results_numerical.success
 
