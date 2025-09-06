@@ -109,6 +109,7 @@ def correct_trajectory(A_func, t_eval, Qs_ode, Lambdas_ode, method="matching"):
 def ogita_aishima_refinement(A, X_hat, max_iter=10, tol=1e-12, rho=1.0):
     """
     Refines a given approximate eigenvector matrix using the Ogita-Aishima method.
+    This implementation is vectorized for performance.
 
     Args:
         A (np.ndarray): The target real symmetric matrix.
@@ -136,28 +137,28 @@ def ogita_aishima_refinement(A, X_hat, max_iter=10, tol=1e-12, rho=1.0):
         s_ii = np.diag(S)
         lambda_tilde = s_ii / (1 - r_ii + 1e-15)
 
-        # 3. Calculate the correction matrix E_tilde
-        E_tilde = np.zeros_like(X_new)
-
-        # Diagonal elements
-        np.fill_diagonal(E_tilde, r_ii / 2.0)
-
-        # Off-diagonal elements
+        # 3. Calculate the correction matrix E_tilde (vectorized)
         s_off_diag = S - np.diag(s_ii)
         delta = rho * np.max(np.abs(s_off_diag))
 
-        for i in range(n):
-            for j in range(n):
-                if i == j:
-                    continue
+        # Differences between all pairs of eigenvalues
+        lambda_diffs = lambda_tilde[np.newaxis, :] - lambda_tilde[:, np.newaxis]
 
-                lambda_diff = lambda_tilde[j] - lambda_tilde[i]
-                if np.abs(lambda_diff) > delta:
-                    # Case 1: Distinct eigenvalues
-                    E_tilde[i, j] = (S[i, j] + lambda_tilde[j] * R[i, j]) / lambda_diff
-                else:
-                    # Case 2: Clustered eigenvalues
-                    E_tilde[i, j] = R[i, j] / 2.0
+        # Mask for distinct eigenvalues (avoiding the diagonal)
+        distinct_mask = np.abs(lambda_diffs) > delta
+        np.fill_diagonal(distinct_mask, False)
+
+        # Numerator for the distinct case update: s_ij + lambda_j * r_ij
+        numerator = S + R * lambda_tilde[np.newaxis, :]
+
+        # Denominator, with a safe value where the mask is false to avoid division by zero
+        denominator = np.where(distinct_mask, lambda_diffs, 1.0)
+
+        # Calculate E_tilde using np.where for conditional logic
+        E_tilde = np.where(distinct_mask, numerator / denominator, R / 2.0)
+
+        # Set diagonal elements
+        np.fill_diagonal(E_tilde, r_ii / 2.0)
 
         # 4. Update the solution
         X_new = X_new @ (Id + E_tilde)
