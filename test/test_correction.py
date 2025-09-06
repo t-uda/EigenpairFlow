@@ -2,6 +2,7 @@ import numpy as np
 import scipy.linalg
 from eigenpairflow.correction import ogita_aishima_refinement
 
+
 def test_ogita_aishima_refinement_simple():
     # Create a random symmetric matrix
     n = 5
@@ -22,6 +23,7 @@ def test_ogita_aishima_refinement_simple():
     refined_error = np.linalg.norm(X_refined - exact_eigvecs)
 
     assert refined_error < initial_error
+
 
 def test_ogita_aishima_refinement_clustered():
     # Create a symmetric matrix with clustered eigenvalues

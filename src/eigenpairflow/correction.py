@@ -123,12 +123,12 @@ def ogita_aishima_refinement(A, X_hat, max_iter=10, tol=1e-12, rho=1.0):
             - D_new: A diagonal matrix containing the refined eigenvalues.
     """
     n = A.shape[0]
-    I = np.eye(n)
+    Id = np.eye(n)
     X_new = X_hat.copy()
 
     for _ in range(max_iter):
         # 1. Calculate residual matrices
-        R = I - X_new.T @ X_new
+        R = Id - X_new.T @ X_new
         S = X_new.T @ A @ X_new
 
         # 2. Calculate approximate eigenvalues
@@ -160,7 +160,7 @@ def ogita_aishima_refinement(A, X_hat, max_iter=10, tol=1e-12, rho=1.0):
                     E_tilde[i, j] = R[i, j] / 2.0
 
         # 4. Update the solution
-        X_new = X_new @ (I + E_tilde)
+        X_new = X_new @ (Id + E_tilde)
 
         # 5. Check for convergence
         if np.linalg.norm(E_tilde) < tol:
