@@ -111,6 +111,7 @@ def eigenpairtrack(
                 A_func, sol.t, Qs, Lambdas, method=correction_method
             )
         except Exception as e:
+            success = False
             message += f" | Correction failed with method '{correction_method}': {e}"
 
     # Calculate the final norm errors
