@@ -15,9 +15,9 @@ def plot_eigenvalue_trajectories(results: EigenTrackingResults, ax=None):
         show_plot = False
 
     if results.Lambdas is not None and results.t_eval is not None:
-        eigenvalues_traces = np.array([np.diag(L) for L in results.Lambdas])
-        for i in range(eigenvalues_traces.shape[1]):
-            ax.plot(results.t_eval, eigenvalues_traces[:, i], label=f"λ_{i+1}(t)")
+        eigenvalue_traces = np.array([np.diag(L) for L in results.Lambdas])
+        for i in range(eigenvalue_traces.shape[1]):
+            ax.plot(results.t_eval, eigenvalue_traces[:, i], label=f"λ_{i+1}(t)")
         ax.set_title("Eigenvalue Trajectories")
         ax.set_xlabel("Parameter t")
         ax.set_xscale("log")
