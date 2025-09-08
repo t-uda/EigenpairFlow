@@ -151,7 +151,7 @@ def ogita_aishima_refinement(A, X_hat, max_iter=10, tol=1e-12, rho=1.0):
         # 2. Calculate approximate eigenvalues
         r_ii = np.diag(R)
         s_ii = np.diag(S)
-        lambda_tilde = s_ii / (1 - r_ii + 1e-15)
+        lambda_tilde = s_ii / (1 - r_ii)
 
         # 3. Calculate the correction matrix E_tilde (vectorized)
         s_off_diag = S - np.diag(s_ii)
@@ -199,5 +199,8 @@ def ogita_aishima_refinement(A, X_hat, max_iter=10, tol=1e-12, rho=1.0):
     sort_indices = np.argsort(final_eigvals)
     D_new = np.diag(final_eigvals[sort_indices])
     X_new = X_new[:, sort_indices]
+    dots = np.sum(X_hat[:, sort_indices] * X_new, axis=0)
+    signs = np.where(dots >= 0, 1.0, -1.0)
+    X_new = X_new * signs
 
     return X_new, D_new
