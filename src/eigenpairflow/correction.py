@@ -4,7 +4,7 @@ from scipy.optimize import linear_sum_assignment
 
 
 def _find_clusters(eigvals, delta):
-    """固有値の差が ``delta`` 未満である連続区間を検出する。"""
+    """固有値を昇順に並べて差が ``delta`` 未満となるグループを検出する。"""
     sorted_idx = np.argsort(eigvals)
     clusters: list[list[int]] = []
     current = [sorted_idx[0]] if sorted_idx.size > 0 else []
@@ -193,14 +193,12 @@ def ogita_aishima_refinement(A, X_hat, max_iter=10, tol=1e-12, rho=1.0):
         if np.linalg.norm(E_tilde) < tol:
             break
 
-    # Final calculation of eigenvalues and sorting
+    # Final calculation of eigenvalues without reordering
     S_final = X_new.T @ A @ X_new
     final_eigvals = np.diag(S_final)
-    sort_indices = np.argsort(final_eigvals)
-    D_new = np.diag(final_eigvals[sort_indices])
-    X_new = X_new[:, sort_indices]
-    dots = np.sum(X_hat[:, sort_indices] * X_new, axis=0)
+    dots = np.sum(X_hat * X_new, axis=0)
     signs = np.where(dots >= 0, 1.0, -1.0)
     X_new = X_new * signs
+    D_new = np.diag(final_eigvals)
 
     return X_new, D_new
