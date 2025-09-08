@@ -3,6 +3,22 @@ import scipy.linalg
 from scipy.optimize import linear_sum_assignment
 
 
+def _find_clusters(eigvals, delta):
+    """固有値の差が ``delta`` 未満である連続区間を検出する。"""
+    sorted_idx = np.argsort(eigvals)
+    clusters: list[list[int]] = []
+    current = [sorted_idx[0]] if sorted_idx.size > 0 else []
+    for idx in sorted_idx[1:]:
+        if abs(eigvals[idx] - eigvals[current[-1]]) < delta:
+            current.append(idx)
+        else:
+            clusters.append(current)
+            current = [idx]
+    if current:
+        clusters.append(current)
+    return clusters
+
+
 def match_decompositions(
     predicted_eigvals, predicted_eigvecs, exact_eigvals, exact_eigvecs
 ):
@@ -108,20 +124,20 @@ def correct_trajectory(A_func, t_eval, Qs_ode, Lambdas_ode, method="matching"):
 
 def ogita_aishima_refinement(A, X_hat, max_iter=10, tol=1e-12, rho=1.0):
     """
-    Refines a given approximate eigenvector matrix using the Ogita-Aishima method.
-    This implementation is vectorized for performance.
+    荻田・相島の方法で近似固有ベクトルを改良する。
+    固有値が近接している場合には小さな部分空間で再対角化を行う。
 
     Args:
-        A (np.ndarray): The target real symmetric matrix.
-        X_hat (np.ndarray): The approximate eigenvector matrix.
-        max_iter (int): Maximum number of iterations.
-        tol (float): Tolerance for convergence.
-        rho (float): Parameter to determine if eigenvalues are clustered.
+        A (np.ndarray): 対称行列。
+        X_hat (np.ndarray): 初期固有ベクトル近似。
+        max_iter (int): 最大反復回数。
+        tol (float): 収束判定の許容誤差。
+        rho (float): 固有値クラスタ判定に用いる係数。
 
     Returns:
         tuple[np.ndarray, np.ndarray]:
-            - X_new: The refined eigenvector matrix.
-            - D_new: A diagonal matrix containing the refined eigenvalues.
+            - X_new: 改良された固有ベクトル。
+            - D_new: 改良された固有値を対角に持つ行列。
     """
     n = A.shape[0]
     Id = np.eye(n)
@@ -163,7 +179,17 @@ def ogita_aishima_refinement(A, X_hat, max_iter=10, tol=1e-12, rho=1.0):
         # 4. Update the solution
         X_new = X_new @ (Id + E_tilde)
 
-        # 5. Check for convergence
+        # 5. Additional refinement for clustered eigenvalues
+        clusters = _find_clusters(lambda_tilde, delta)
+        for cluster in clusters:
+            if len(cluster) > 1:
+                X_block = X_new[:, cluster]
+                X_block, _ = np.linalg.qr(X_block)
+                B = X_block.T @ A @ X_block
+                w, V = np.linalg.eigh(B)
+                X_new[:, cluster] = X_block @ V
+
+        # 6. Check for convergence
         if np.linalg.norm(E_tilde) < tol:
             break
 
