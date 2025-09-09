@@ -105,6 +105,7 @@ def run_analytical_test(m, n):
         matrix_type="symmetric",
         method="eigh",
         correction_method=None,
+        solver_method="DOP853",
     )
     assert results_numerical.success
 

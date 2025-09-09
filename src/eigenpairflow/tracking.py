@@ -1,16 +1,40 @@
 import numpy as np
 import scipy.linalg
 import scipy.integrate
+from types import SimpleNamespace
 
 from .ode import symmetric_ode_derivative
 from .correction import correct_trajectory
 from .types import EigenTrackingResults
 
 
-def _track_symmetric_eigh(A_func, dA_func, t_span, t_eval, rtol, atol):
+def _track_symmetric_eigh(
+    A_func,
+    dA_func,
+    t_span,
+    t_eval,
+    solver_method="Euler",
+    rtol=1e-13,
+    atol=1e-12,
+    dense_output=False,
+):
     """
-    (internal) Tracks the eigenvalue decomposition of a symmetric matrix family A(t)
-    using an ODE solver for the eigendecomposition (eigh).
+    (内部関数) 対称行列族 A(t) の固有分解を指定された ODE 解法で追跡する。
+
+    Args:
+        A_func (callable): 時刻 t に対して行列 A(t) を返す関数。
+        dA_func (callable): 時刻 t に対して微分 dA/dt を返す関数。
+        t_span (tuple): 追跡する時間区間 (t_start, t_end)。
+        t_eval (np.ndarray): 結果を保存する時刻の配列。
+        solver_method (str): ODE の解法。 ``'Euler'`` を指定すると前進 Euler 法を用いる。
+        rtol (float): ``solve_ivp`` 利用時の相対誤差許容値。
+        atol (float): ``solve_ivp`` 利用時の絶対誤差許容値。
+        dense_output (bool): ``solve_ivp`` で密な出力を生成するかどうか。
+
+    Returns:
+        tuple[list[np.ndarray], list[np.ndarray], object]:
+            各時刻の固有ベクトル・固有値行列と、
+            ``solve_ivp`` の戻り値または同等のオブジェクト。
     """
     t0 = t_span[0]
     A0 = A_func(t0)
@@ -23,19 +47,33 @@ def _track_symmetric_eigh(A_func, dA_func, t_span, t_eval, rtol, atol):
 
     y0 = np.concatenate([Q0.flatten(), lambdas0])
 
-    sol = scipy.integrate.solve_ivp(
-        symmetric_ode_derivative,
-        t_span,
-        y0,
-        method="DOP853",
-        t_eval=t_eval,
-        args=(n, dA_func),
-        rtol=rtol,
-        atol=atol,
-        dense_output=True,
-    )
-    if not sol.success:
-        raise RuntimeError(f"Integration failed. {sol.message=}")
+    if solver_method.lower() == "euler":
+        t_values = np.array(t_eval)
+        if not np.isclose(t_values[0], t0):
+            raise ValueError("t_eval must start with t_span[0] for Euler solver")
+        num_steps = t_values.size
+        y = np.zeros((y0.size, num_steps))
+        y[:, 0] = y0
+        for i in range(num_steps - 1):
+            t_i = t_values[i]
+            dt = t_values[i + 1] - t_i
+            dydt = symmetric_ode_derivative(t_i, y[:, i], n, dA_func)
+            y[:, i + 1] = y[:, i] + dt * dydt
+        sol = SimpleNamespace(t=t_values, y=y, success=True, message="Euler integration")
+    else:
+        sol = scipy.integrate.solve_ivp(
+            symmetric_ode_derivative,
+            t_span,
+            y0,
+            method=solver_method,
+            t_eval=t_eval,
+            args=(n, dA_func),
+            rtol=rtol,
+            atol=atol,
+            dense_output=dense_output,
+        )
+        if not sol.success:
+            raise RuntimeError(f"Integration failed. {sol.message=}")
 
     Qs = [sol_y[: n * n].reshape((n, n)) for sol_y in sol.y.T]
     Lambdas = [np.diag(sol_y[n * n :]) for sol_y in sol.y.T]
@@ -50,32 +88,32 @@ def eigenpairtrack(
     t_eval,
     matrix_type="symmetric",
     method="eigh",
-    correction_method="matching",
+    correction_method="ogita_aishima",
+    solver_method="Euler",
     rtol=1e-13,
     atol=1e-12,
+    dense_output=False,
 ):
     """
-    Tracks the eigen-decomposition of a parameter-dependent matrix A(t).
+    パラメータに依存する行列 A(t) の固有分解を追跡する。
 
-    This high-level interface dispatches to the appropriate solver based on the
-    matrix type and desired decomposition method.
+    行列の種類や時間積分の解法に応じて内部の計算を振り分ける高水準インターフェース。
 
     Args:
-        A_func (callable): Function that returns matrix A(t) for a given time t.
-        dA_func (callable): Function that returns the derivative dA/dt for a given time t.
-        t_span (tuple): Time interval for the tracking (t_start, t_end).
-        t_eval (np.ndarray): Array of time points to evaluate the results.
-        matrix_type (str): The type of the matrix. Currently only "symmetric" is supported.
-        method (str): The decomposition method. Currently only "eigh" is supported.
-        correction_method (str or None): The correction method to apply.
-                                     'matching': Re-calculates and matches.
-                                     'ogita_aishima': Uses iterative refinement.
-                                     None: No correction is applied.
-        rtol (float): Relative tolerance for the ODE solver.
-        atol (float): Absolute tolerance for the ODE solver.
+        A_func (callable): 時刻 t に対して行列 A(t) を返す関数。
+        dA_func (callable): 時刻 t に対して微分 dA/dt を返す関数。
+        t_span (tuple): 追跡する時間区間 (t_start, t_end)。
+        t_eval (np.ndarray): 結果を保存する時刻の配列。
+        matrix_type (str): 行列の種類。現在は ``"symmetric"`` のみ対応。
+        method (str): 固有分解の手法。現在は ``"eigh"`` のみ対応。
+        correction_method (str or None): 補正手法。 ``'ogita_aishima'`` がデフォルト。
+        solver_method (str): ODE の解法。 ``'Euler'`` を指定すると前進 Euler 法を用いる。
+        rtol (float): ``solve_ivp`` 利用時の相対誤差許容値。
+        atol (float): ``solve_ivp`` 利用時の絶対誤差許容値。
+        dense_output (bool): ``solve_ivp`` で密な出力を生成するかどうか。
 
     Returns:
-        EigenTrackingResults: An object containing the results of the tracking and analysis.
+        EigenTrackingResults: 追跡と解析結果を含むオブジェクト。
     """
     if matrix_type != "symmetric" or method != "eigh":
         raise NotImplementedError(
@@ -85,7 +123,14 @@ def eigenpairtrack(
     # --- Dispatch to the appropriate low-level tracker ---
     try:
         Qs, Lambdas, sol = _track_symmetric_eigh(
-            A_func, dA_func, t_span, t_eval, rtol=rtol, atol=atol
+            A_func,
+            dA_func,
+            t_span,
+            t_eval,
+            solver_method=solver_method,
+            rtol=rtol,
+            atol=atol,
+            dense_output=dense_output,
         )
         success = sol.success
         message = sol.message

@@ -33,6 +33,7 @@ def test_track_runs_with_graph_example():
         matrix_type="symmetric",
         method="eigh",
         correction_method="matching",
+        solver_method="DOP853",
     )
 
     # 4. Assert that the function ran successfully
