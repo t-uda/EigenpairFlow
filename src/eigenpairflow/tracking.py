@@ -49,6 +49,8 @@ def _track_symmetric_eigh(
 
     if solver_method.lower() == "euler":
         t_values = np.array(t_eval)
+        if not np.isclose(t_values[0], t0):
+            raise ValueError("t_eval must start with t_span[0] for Euler solver")
         num_steps = t_values.size
         y = np.zeros((y0.size, num_steps))
         y[:, 0] = y0

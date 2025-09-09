@@ -43,3 +43,18 @@ def test_solver_method_combinations(solver_method, dense_output):
 
     assert results.success
     assert len(results.t_eval) == len(t_eval)
+
+
+def test_euler_requires_initial_time():
+    """Euler 法では ``t_eval`` の最初の値が開始時刻に一致しない場合に例外を送出することを確認する。"""
+    t_span = (0.0, 1.0)
+    t_eval = np.linspace(0.1, 1.0, 5)
+
+    with pytest.raises(ValueError):
+        eigenpairtrack(
+            _basic_matrix,
+            _d_basic_matrix,
+            t_span,
+            t_eval,
+            solver_method="Euler",
+        )
