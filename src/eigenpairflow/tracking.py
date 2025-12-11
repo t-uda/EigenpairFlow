@@ -4,8 +4,12 @@ import scipy.integrate
 from types import SimpleNamespace
 
 from .ode import symmetric_ode_derivative
-from .correction import correct_trajectory, ogita_aishima_refinement
-from .types import EigenTrackingResults
+from .correction import (
+    correct_trajectory,
+    ogita_aishima_refinement,
+    ogita_svd_refinement,
+)
+from .types import EigenTrackingResults, SVTrackingResults
 
 
 def _track_ogita_aishima(A_func, t_eval, *, max_iter=10, tol=1.0e-12, rho=1.0):
@@ -204,6 +208,126 @@ def eigenpairtrack(
         Qs=Qs,
         Lambdas=Lambdas,
         norm_errors=norm_errors,
+        success=success,
+        message=message,
+    )
+
+
+# --- SVD Tracking Functions ---
+
+
+def _track_ogita_svd(
+    A_func, t_eval, U0=None, S0=None, V0=None, *, max_iter=10, tol=1.0e-12
+):
+    """
+    Tracks the SVD of a parameter-dependent matrix using Ogita's iterative refinement.
+    """
+    if len(t_eval) == 0:
+        return (
+            [],
+            [],
+            [],
+            SimpleNamespace(success=False, message="No time points provided."),
+        )
+
+    t0 = t_eval[0]
+
+    # Initial SVD
+    if U0 is not None and S0 is not None and V0 is not None:
+        U, S, V = U0, S0, V0
+    else:
+        A0 = A_func(t0)
+        # Using full_matrices=False is standard for compact SVD
+        U, S, Vt = np.linalg.svd(A0, full_matrices=False)
+        V = Vt.T
+
+    # Storage
+    Us = [U]
+    Ss = [S]
+    Vs = [V]
+
+    # Track
+    for t in t_eval[1:]:
+        A_t = A_func(t)
+        # Use previous U, S, V as initial guess
+        U_next, S_next, V_next = ogita_svd_refinement(
+            A_t, Us[-1], Ss[-1], Vs[-1], max_iter=max_iter, tol=tol
+        )
+        Us.append(U_next)
+        Ss.append(S_next)
+        Vs.append(V_next)
+
+    sol = SimpleNamespace(t_eval=t_eval, success=True, message="Ogita-SVD Tracking")
+    return Us, Ss, Vs, sol
+
+
+def singularpairtrack(
+    A_func,
+    t_eval,
+    U0=None,
+    S0=None,
+    V0=None,
+    solver_method="ogita_svd",
+    tol=1e-12,
+):
+    """
+    Tracks the Singular Value Decomposition (SVD) of a parameter-dependent matrix A(t).
+
+    Args:
+        A_func (callable): Function A(t) returning the matrix at time t.
+        t_eval (np.ndarray): Array of time points to evaluate/track.
+        U0, S0, V0 (np.ndarray, optional): Initial decomposition at t_eval[0].
+                                            If not provided, it's computed.
+        solver_method (str): Method to use for tracking. Currently only 'ogita_svd'.
+        tol (float): Tolerance for the refinement process.
+
+    Returns:
+        SVTrackingResults: Object containing Us, Ss, Vs, and error metrics.
+    """
+    if solver_method != "ogita_svd":
+        raise NotImplementedError(
+            f"SVD tracking method '{solver_method}' is not implemented."
+        )
+
+    try:
+        Us, Ss, Vs, sol = _track_ogita_svd(A_func, t_eval, U0, S0, V0, tol=tol)
+        success = sol.success
+        message = sol.message
+    except Exception as e:
+        success = False
+        message = f"SVD Tracking failed: {e}"
+        Us, Ss, Vs = None, None, None
+
+    if not success:
+        return SVTrackingResults(
+            t_eval=t_eval,
+            Us=None,
+            Ss=None,
+            Vs=None,
+            norm_errors=None,
+            success=False,
+            message=message,
+        )
+
+    # Calculate reconstruction errors
+    norm_errors = []
+    for i, t in enumerate(t_eval):
+        A_t = A_func(t)
+        # Reconstruct: U * S * V^T
+        if Us is not None and Ss is not None and Vs is not None:
+            S_mat = np.diag(Ss[i])
+            A_recon = Us[i] @ S_mat @ Vs[i].T
+            error = np.linalg.norm(A_t - A_recon, "fro")
+            norm_errors.append(error)
+        else:
+            norm_errors.append(np.inf)
+
+    return SVTrackingResults(
+        t_eval=t_eval,
+        Us=Us,
+        Ss=Ss,
+        Vs=Vs,
+        norm_errors=np.array(norm_errors),
         success=success,
         message=message,
     )

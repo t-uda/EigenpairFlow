@@ -202,3 +202,123 @@ def ogita_aishima_refinement(A, X_hat, max_iter=10, tol=1e-12, rho=1.0):
     D_new = np.diag(final_eigvals)
 
     return X_new, D_new
+
+
+def ogita_svd_refinement(A, U, S, V, max_iter=10, tol=1e-12):
+    """
+    Ogita の SVD 反復改良法を実装する。
+
+    パラメータ依存関数の連続な SVD を得るために、前時刻の SVD を初期値として
+    反復改良を行う。特異値が近接している場合 (縮退) にも、部分空間の不要な回転を
+    避けることで連続性を維持する。
+
+    Args:
+        A (np.ndarray): 対象とする実一般行列 (m x n)。
+        U (np.ndarray): 近似左特異ベクトル行列 (m x k)。列がベクトル。
+        S (np.ndarray): 近似特異値ベクトル (k)。
+        V (np.ndarray): 近似右特異ベクトル行列 (n x k)。列がベクトル (注意: V.T ではない)。
+        max_iter (int): 最大反復回数。
+        tol (float): 縮退判定および収束判定の許容誤差。
+
+    Returns:
+        tuple[np.ndarray, np.ndarray, np.ndarray]:
+            - U_new: 改良された左特異ベクトル行列。
+            - S_new: 改良された特異値。
+            - V_new: 改良された右特異ベクトル行列。
+    """
+    U_curr = U.copy()
+    V_curr = V.copy()
+    S_curr = S.copy()
+
+    k = S.shape[0]
+
+    for _ in range(max_iter):
+        # 1. Residual calculation
+        # F = U^T R V = U^T A V - diag(S)
+        # Using cost reduction formula from documentation
+        AV = A @ V_curr
+        F = U_curr.T @ AV - np.diag(S_curr)
+
+        # 2. Correction matrix construction
+        # Calculate determinant D = s_j^2 - s_i^2
+        s_i = S_curr[:, np.newaxis]
+        s_j = S_curr[np.newaxis, :]
+        D = s_j**2 - s_i**2
+
+        # Identify distinct pairs
+        # Explicitly exclude diagonal (where D=0)
+        distinct_mask = np.abs(D) > tol
+        np.fill_diagonal(distinct_mask, False)
+
+        # Prepare X, Y matrices (initialized to 0)
+        X = np.zeros((k, k))
+        Y = np.zeros((k, k))
+
+        # Update diagonal of S
+        dS = np.diag(F)
+
+        # Calculate X, Y for distinct pairs
+        # F_ji is F.T
+        F_ij = F
+        F_ji = F.T
+
+        num_X = s_j * F_ij + s_i * F_ji
+        num_Y = s_i * F_ij + s_j * F_ji
+
+        X[distinct_mask] = num_X[distinct_mask] / D[distinct_mask]
+        Y[distinct_mask] = num_Y[distinct_mask] / D[distinct_mask]
+
+        # Degenerate case is implicitly handled (0 initialization for X, Y)
+        # This maintains continuity as per Ogita's strategy
+
+        # 3. Update
+        # U_tmp = U (I + X), V_tmp = V (I + Y)
+        Id = np.eye(k)
+        U_tmp = U_curr @ (Id + X)
+        V_tmp = V_curr @ (Id + Y)
+
+        S_new = S_curr + dS
+
+        # 4. Re-orthogonalization (QR)
+        U_new, _ = np.linalg.qr(U_tmp)
+        V_new, _ = np.linalg.qr(V_tmp)
+
+        # 5. Sign alignment (Continuity & QR ambiguity fix)
+        # Align U_new columns with U_curr
+        dots_U = np.sum(U_curr * U_new, axis=0)
+        signs_U = np.sign(dots_U)
+        signs_U[signs_U == 0] = 1.0
+
+        # Align V_new columns with V_curr
+        dots_V = np.sum(V_curr * V_new, axis=0)
+        signs_V = np.sign(dots_V)
+        signs_V[signs_V == 0] = 1.0
+
+        # Apply signs
+        U_new = U_new * signs_U[np.newaxis, :]
+        V_new = V_new * signs_V[np.newaxis, :]
+
+        S_new = S_curr + dS
+
+        # Ensure non-negative singular values
+        neg_S_mask = S_new < 0
+        if np.any(neg_S_mask):
+            S_new[neg_S_mask] *= -1
+            U_new[:, neg_S_mask] *= -1
+
+        # Check convergence
+        if (
+            np.max(np.abs(X)) < tol
+            and np.max(np.abs(Y)) < tol
+            and np.max(np.abs(dS)) < tol
+        ):
+            U_curr = U_new
+            V_curr = V_new
+            S_curr = S_new
+            break
+
+        U_curr = U_new
+        V_curr = V_new
+        S_curr = S_new
+
+    return U_curr, S_curr, V_curr
