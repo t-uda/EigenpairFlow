@@ -80,3 +80,41 @@ def plot_tracking_results(results: EigenTrackingResults, axes=None):
         plt.show()
 
     return axes
+
+
+def plot_eigenvectors_rotation(
+    result: EigenTrackingResults, ax=None
+):
+    """
+    内積から得られる「角度」の累積値によって固有ベクトルの角度の推移を描画する。
+
+    Args:
+        result (EigenTrackingResults): 固有値追跡の結果。
+        ax (matplotlib.axes.Axes, optional): 描画先。指定しなければ新たに生成する。
+
+    Returns:
+        matplotlib.axes.Axes: 描画に使用した Axes。
+    """
+    if ax is None:
+        _, ax = plt.subplots(1, 1, figsize=(8, 6))
+        show_plot = True
+    else:
+        show_plot = False
+
+    if result.Qs is not None and result.t_eval is not None:
+        t = result.t_eval
+        t_index = np.arange(len(t) - 1)
+        # [t_index, row_index, column_index]
+        eigenvecs = np.array(result.Qs)
+        cosines = np.sum(eigenvecs[t_index + 1] * eigenvecs[t_index], axis=1)
+        thetas = np.arccos(np.where(cosines > 1.0, 1.0, cosines))
+        dt = (t[t_index + 1] - t[t_index])[:, None]
+        ax.plot(t[1:], np.add.accumulate(thetas * dt), lw=1, label=np.arange(thetas.shape[1]))
+        ax.set_title("Eigenvector Rotation Dynamics")
+        ax.set_xlabel("Parameter t")
+        ax.set_ylabel("Accumulated Angle θ")
+
+    if show_plot:
+        plt.show()
+
+    return ax

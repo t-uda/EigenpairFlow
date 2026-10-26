@@ -122,7 +122,7 @@ def correct_trajectory(A_func, t_eval, Qs_ode, Lambdas_ode, method="matching"):
     return corrected_Qs, corrected_Lambdas
 
 
-def ogita_aishima_refinement(A, X_hat, max_iter=10, tol=1e-12, rho=1.0):
+def ogita_aishima_refinement(A, X_hat, max_iter=30, tol=1e-14, rho=2.0, fix_clusters=False):
     """
     荻田・相島の方法で近似固有ベクトルを改良する。
     固有値が近接している場合には小さな部分空間で再対角化を行う。
@@ -180,17 +180,18 @@ def ogita_aishima_refinement(A, X_hat, max_iter=10, tol=1e-12, rho=1.0):
         X_new = X_new @ (Id + E_tilde)
 
         # 5. Additional refinement for clustered eigenvalues
-        clusters = _find_clusters(lambda_tilde, delta)
-        for cluster in clusters:
-            if len(cluster) > 1:
-                X_block = X_new[:, cluster]
-                X_block, _ = np.linalg.qr(X_block)
-                B = X_block.T @ A @ X_block
-                w, V = np.linalg.eigh(B)
-                X_new[:, cluster] = X_block @ V
+        if fix_clusters:
+            clusters = _find_clusters(lambda_tilde, delta)
+            for cluster in clusters:
+                if len(cluster) > 1:
+                    X_block = X_new[:, cluster]
+                    X_block, _ = np.linalg.qr(X_block)
+                    B = X_block.T @ A @ X_block
+                    w, V = np.linalg.eigh(B)
+                    X_new[:, cluster] = X_block @ V
 
         # 6. Check for convergence
-        if np.linalg.norm(E_tilde) < tol:
+        if np.linalg.norm(E_tilde.flatten(), ord=np.inf) < tol:
             break
 
     # Final calculation of eigenvalues without reordering
